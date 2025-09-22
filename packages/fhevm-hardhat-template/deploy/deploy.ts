@@ -9,7 +9,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = await hre.getChainId();
   const chainName = hre.network.name;
 
-  const contractName = "FHECounter";
+  const contractName = "RockPaperScissors";
   const deployed = await deploy(contractName, {
     from: deployer,
     log: true,
@@ -20,12 +20,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`${contractName} chainName: ${chainName}`);
 
   // Generates:
-  //  - <root>/packages/site/abi/FHECounterABI.ts
-  //  - <root>/packages/site/abi/FHECounterAddresses.ts
+  //  - <root>/packages/site/abi/RockPaperScissorsABI.ts
+  //  - <root>/packages/site/abi/RockPaperScissorsAddresses.ts
   postDeploy(chainName, contractName);
 };
 
 export default func;
 
-func.id = "deploy_fheCounter"; // id required to prevent reexecution
-func.tags = ["FHECounter"];
+func.id = "deploy_rockPaperScissors"; // id required to prevent reexecution
+func.tags = ["RockPaperScissors"];
