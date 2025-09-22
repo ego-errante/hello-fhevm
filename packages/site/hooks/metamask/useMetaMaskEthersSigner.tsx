@@ -17,6 +17,7 @@ export interface UseMetaMaskEthersSignerState {
   isConnected: boolean;
   error: Error | undefined;
   connect: () => void;
+  disconnect: () => void;
   sameChain: RefObject<(chainId: number | undefined) => boolean>;
   sameSigner: RefObject<
     (ethersSigner: ethers.JsonRpcSigner | undefined) => boolean
@@ -27,9 +28,19 @@ export interface UseMetaMaskEthersSignerState {
   initialMockChains: Readonly<Record<number, string>> | undefined;
 }
 
-function useMetaMaskEthersSignerInternal(parameters: { initialMockChains?: Readonly<Record<number, string>> }): UseMetaMaskEthersSignerState {
+function useMetaMaskEthersSignerInternal(parameters: {
+  initialMockChains?: Readonly<Record<number, string>>;
+}): UseMetaMaskEthersSignerState {
   const { initialMockChains } = parameters;
-  const { provider, chainId, accounts, isConnected, connect, error } = useMetaMask();
+  const {
+    provider,
+    chainId,
+    accounts,
+    isConnected,
+    connect,
+    disconnect,
+    error,
+  } = useMetaMask();
   const [ethersSigner, setEthersSigner] = useState<
     ethers.JsonRpcSigner | undefined
   >(undefined);
@@ -72,19 +83,25 @@ function useMetaMaskEthersSignerInternal(parameters: { initialMockChains?: Reado
       return;
     }
 
-    console.warn(`[useMetaMaskEthersSignerInternal] create new ethers.BrowserProvider(), chainId=${chainId}`);
+    console.warn(
+      `[useMetaMaskEthersSignerInternal] create new ethers.BrowserProvider(), chainId=${chainId}`
+    );
 
     const bp: ethers.BrowserProvider = new ethers.BrowserProvider(provider);
     let rop: ethers.ContractRunner = bp;
     const rpcUrl: string | undefined = initialMockChains?.[chainId];
     if (rpcUrl) {
       // Try to avoid using MetaMask Eip1193Provider for view functions in mock mode
-      // MetaMask keeps a cache value of all view function calls. When using a dev node, this can be problematic and 
+      // MetaMask keeps a cache value of all view function calls. When using a dev node, this can be problematic and
       // lead to nasty bugs. See README for more infos.
       rop = new ethers.JsonRpcProvider(rpcUrl);
-      console.warn(`[useMetaMaskEthersSignerInternal] create new readonly provider ethers.JsonRpcProvider(${rpcUrl}), chainId=${chainId}`);
+      console.warn(
+        `[useMetaMaskEthersSignerInternal] create new readonly provider ethers.JsonRpcProvider(${rpcUrl}), chainId=${chainId}`
+      );
     } else {
-      console.warn(`[useMetaMaskEthersSignerInternal] use ethers.BrowserProvider() as readonly provider, chainId=${chainId}`);
+      console.warn(
+        `[useMetaMaskEthersSignerInternal] use ethers.BrowserProvider() as readonly provider, chainId=${chainId}`
+      );
     }
 
     const s = new ethers.JsonRpcSigner(bp, accounts[0]);
@@ -102,26 +119,27 @@ function useMetaMaskEthersSignerInternal(parameters: { initialMockChains?: Reado
     accounts,
     isConnected,
     connect,
+    disconnect,
     ethersBrowserProvider,
     ethersReadonlyProvider,
     ethersSigner,
     error,
-    initialMockChains
+    initialMockChains,
   };
 }
 
-const MetaMaskEthersSignerContext = createContext<UseMetaMaskEthersSignerState | undefined>(
-  undefined
-);
+const MetaMaskEthersSignerContext = createContext<
+  UseMetaMaskEthersSignerState | undefined
+>(undefined);
 
 interface MetaMaskEthersSignerProviderProps {
   children: ReactNode;
   initialMockChains: Readonly<Record<number, string>>;
 }
 
-export const MetaMaskEthersSignerProvider: React.FC<MetaMaskEthersSignerProviderProps> = ({
-  children, initialMockChains
-}) => {
+export const MetaMaskEthersSignerProvider: React.FC<
+  MetaMaskEthersSignerProviderProps
+> = ({ children, initialMockChains }) => {
   const props = useMetaMaskEthersSignerInternal({ initialMockChains });
   return (
     <MetaMaskEthersSignerContext.Provider value={props}>
@@ -133,7 +151,9 @@ export const MetaMaskEthersSignerProvider: React.FC<MetaMaskEthersSignerProvider
 export function useMetaMaskEthersSigner() {
   const context = useContext(MetaMaskEthersSignerContext);
   if (context === undefined) {
-    throw new Error("useMetaMaskEthersSigner must be used within a MetaMaskEthersSignerProvider");
+    throw new Error(
+      "useMetaMaskEthersSigner must be used within a MetaMaskEthersSignerProvider"
+    );
   }
   return context;
 }

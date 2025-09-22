@@ -13,7 +13,13 @@ type Props = {
 export function Providers({ children }: Props) {
   return (
     <MetaMaskProvider>
-      <MetaMaskEthersSignerProvider initialMockChains={{ 31337: "http://localhost:8545" }}>
+      <MetaMaskEthersSignerProvider
+        initialMockChains={{
+          // 31337: "http://localhost:8545",
+          11155111:
+            "https://sepolia.infura.io/v3/9aadf67222e842aba70a6238829e66cc",
+        }}
+      >
         <InMemoryStorageProvider>{children}</InMemoryStorageProvider>
       </MetaMaskEthersSignerProvider>
     </MetaMaskProvider>
