@@ -76,7 +76,6 @@ describe("RockPaperScissors", function () {
       expect(game.player1).to.equal(signers.alice.address);
       expect(game.player2).to.equal(ethers.ZeroAddress);
       expect(game.status).to.equal(0); // Created = 0
-      expect(game.player1Submitted).to.equal(false);
       // Encrypted moves should be initialized (but encrypted zeros, not zero hash)
       expect(game.move1).to.equal(ethers.ZeroHash);
       expect(game.move2).to.equal(ethers.ZeroHash);
@@ -177,8 +176,7 @@ describe("RockPaperScissors", function () {
 
       // Verify game state
       const game = await rockPaperScissorsContract.getGame(gameId);
-      expect(game.player1Submitted).to.equal(true);
-      expect(game.status).to.equal(0); // Still Created until player2 joins
+      expect(game.status).to.equal(1); // Player1MoveSubmitted
       expect(game.move1).to.not.equal(ethers.ZeroHash);
     });
 
@@ -248,7 +246,7 @@ describe("RockPaperScissors", function () {
         rockPaperScissorsContract
           .connect(signers.alice)
           .submitEncryptedMove(gameId, encryptedMove2.handles[0], encryptedMove2.inputProof),
-      ).to.be.revertedWith("Player1 move already submitted");
+      ).to.be.revertedWith("Player1 can only submit in Created state");
     });
 
     it("should prevent player2 from submitting before player1", async function () {
@@ -261,7 +259,7 @@ describe("RockPaperScissors", function () {
         rockPaperScissorsContract
           .connect(signers.bob)
           .submitEncryptedMove(gameId, encryptedMove.handles[0], encryptedMove.inputProof),
-      ).to.be.revertedWith("Player1 must submit their move before Player2 can join");
+      ).to.be.revertedWith("Player1 must submit their move first");
     });
 
     it("should prevent more than 2 players submissions", async function () {
@@ -295,11 +293,11 @@ describe("RockPaperScissors", function () {
         rockPaperScissorsContract
           .connect(signers.charlie)
           .submitEncryptedMove(gameId, charlieEncryptedMove.handles[0], charlieEncryptedMove.inputProof),
-      ).to.be.revertedWith("Game is not in correct state for move submission");
+      ).to.be.revertedWith("Game is already resolved");
     });
   });
 
-  describe("resolveGame", function () {
+  describe("Game Logic and Resolution", function () {
     let gameId: bigint;
 
     beforeEach(async function () {
@@ -337,39 +335,6 @@ describe("RockPaperScissors", function () {
       const game = await rockPaperScissorsContract.getGame(gameId);
       expect(game.status).to.equal(2); // Resolved (auto-resolved)
       expect(game.result).to.not.equal(ethers.ZeroHash);
-    });
-
-    it("should prevent resolving game before both moves submitted", async function () {
-      await expect(rockPaperScissorsContract.resolveGame(gameId)).to.be.revertedWith(
-        "Both players must have submitted moves",
-      );
-
-      // Submit only player1 move
-      const p1EncryptedMove = await fhevm
-        .createEncryptedInput(rockPaperScissorsContractAddress, signers.alice.address)
-        .add8(0)
-        .encrypt();
-
-      await rockPaperScissorsContract
-        .connect(signers.alice)
-        .submitEncryptedMove(gameId, p1EncryptedMove.handles[0], p1EncryptedMove.inputProof);
-
-      await expect(rockPaperScissorsContract.resolveGame(gameId)).to.be.revertedWith(
-        "Both players must have submitted moves",
-      );
-    });
-
-    it("should prevent resolving already auto-resolved games", async function () {
-      await submitBothMoves(0, 1); // Both moves submitted, game auto-resolved
-
-      // Game should already be resolved
-      const game = await rockPaperScissorsContract.getGame(gameId);
-      expect(game.status).to.equal(2); // Resolved
-
-      // Should not be able to resolve again
-      await expect(rockPaperScissorsContract.resolveGame(gameId)).to.be.revertedWith(
-        "Both players must have submitted moves",
-      );
     });
 
     it("should auto-resolve games without requiring manual resolution", async function () {
@@ -552,10 +517,9 @@ describe("RockPaperScissors", function () {
       ).to.be.rejectedWith(/is not authorized to user decrypt handle/i);
     });
 
-    it("should prevent non-players from accessing result", async function () {
-      await expect(rockPaperScissorsContract.connect(signers.charlie).getResult(gameId)).to.be.revertedWith(
-        "Only game participants can view the result",
-      );
+    it("should allow anyone to access the result", async function () {
+      const result = await rockPaperScissorsContract.connect(signers.charlie).getResult(gameId);
+      expect(result).to.not.equal(ethers.ZeroHash);
     });
 
     it("should allow players to access their own move", async function () {

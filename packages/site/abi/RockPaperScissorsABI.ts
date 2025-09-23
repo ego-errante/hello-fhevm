@@ -141,11 +141,6 @@ export const RockPaperScissorsABI = {
           "type": "uint8"
         },
         {
-          "internalType": "bool",
-          "name": "player1Submitted",
-          "type": "bool"
-        },
-        {
           "internalType": "uint256",
           "name": "createdAt",
           "type": "uint256"
@@ -227,19 +222,6 @@ export const RockPaperScissorsABI = {
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "gameId",
-          "type": "uint256"
-        }
-      ],
-      "name": "resolveGame",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

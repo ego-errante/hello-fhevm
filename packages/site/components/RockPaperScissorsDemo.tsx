@@ -11,6 +11,7 @@ import { useState } from "react";
 import {
   FaHandRock,
   FaHandPaper,
+  FaHandScissors,
   FaRegHandScissors,
   FaRegHandPaper,
   FaRegHandRock,
@@ -209,226 +210,6 @@ export const RockPaperScissorsDemo = () => {
     }
   };
 
-  // console.log(
-  //   "[RockPaperScissorsDemo] rockPaperScissors.gameDisplayState",
-  //   rockPaperScissors.gameDisplayState
-  // );
-
-  // GameStatusBox component
-  function GameStatusBox({
-    displayState,
-    gameData,
-    gameId,
-    onCreateGame,
-    onJoinGame,
-    onSubmitMove,
-    onResolveGame,
-    canCreateGame,
-    canJoinGame,
-    canSubmitMove,
-    canResolveGame,
-    gameResult,
-    isViewingResults,
-    onViewResults,
-  }: {
-    displayState: string;
-    gameData: any;
-    gameId: bigint | null;
-    onCreateGame: () => void;
-    onJoinGame: () => void;
-    onSubmitMove: () => void;
-    onResolveGame: () => void;
-    canCreateGame: boolean;
-    canJoinGame: boolean;
-    canSubmitMove: boolean;
-    canResolveGame: boolean;
-    gameResult: string | null;
-    isViewingResults: boolean;
-    onViewResults: () => void;
-  }) {
-    const renderContent = (onViewResults: () => void) => {
-      switch (displayState) {
-        case "player1":
-          return (
-            <div className="space-y-3">
-              <div className="text-sm">
-                <span className="font-medium">Your Role:</span> Player 1
-              </div>
-              <div className="text-sm">
-                <span className="font-medium">Opponent:</span>
-                <p className="text-xs font-mono break-all mt-1">
-                  {gameData.player2 &&
-                  gameData.player2 !==
-                    "0x0000000000000000000000000000000000000000"
-                    ? gameData.player2
-                    : "Waiting for opponent"}
-                </p>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium">Status:</span>
-                <p className="text-xs mt-1">
-                  {gameData.status === BigInt(0) && "Waiting for moves"}
-                  {gameData.status === BigInt(1) &&
-                    "Moves submitted - can resolve"}
-                  {gameData.status === BigInt(2) && "Game resolved"}
-                </p>
-              </div>
-              <div className="pt-2 space-y-2">
-                {gameData.status === BigInt(0) && (
-                  <button
-                    onClick={onSubmitMove}
-                    disabled={!canSubmitMove}
-                    className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
-                  >
-                    Submit Your Move
-                  </button>
-                )}
-                {gameData.status === BigInt(1) && (
-                  <button
-                    onClick={onResolveGame}
-                    disabled={!canResolveGame}
-                    className="w-full bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:bg-gray-400"
-                  >
-                    Resolve Game
-                  </button>
-                )}
-                {gameData.status === BigInt(2) && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={onViewResults}
-                      disabled={isViewingResults}
-                      className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
-                    >
-                      {isViewingResults ? "Decrypting..." : "View Results"}
-                    </button>
-                    <button
-                      onClick={onCreateGame}
-                      disabled={!canCreateGame}
-                      className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
-                    >
-                      New Game
-                    </button>
-                  </div>
-                )}
-                {gameResult && (
-                  <div className="w-full bg-green-100 border border-green-300 rounded p-3 text-center">
-                    <p className="text-green-800 font-semibold text-lg">
-                      {gameResult}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-
-        case "player2":
-          return (
-            <div className="space-y-3">
-              <div className="text-sm">
-                <span className="font-medium">Your Role:</span> Player 2
-              </div>
-              <div className="text-sm">
-                <span className="font-medium">Opponent:</span>
-                <p className="text-xs font-mono break-all mt-1">
-                  {gameData.player1}
-                </p>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium">Status:</span>
-                <p className="text-xs mt-1">
-                  Move submitted - waiting for results
-                </p>
-              </div>
-              <div className="pt-2 space-y-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={onViewResults}
-                    disabled={isViewingResults}
-                    className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
-                  >
-                    {isViewingResults ? "Decrypting..." : "View Results"}
-                  </button>
-                  <button
-                    onClick={onCreateGame}
-                    disabled={!canCreateGame}
-                    className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
-                  >
-                    New Game
-                  </button>
-                </div>
-                {gameResult && (
-                  <div className="w-full bg-green-100 border border-green-300 rounded p-3 text-center">
-                    <p className="text-green-800 font-semibold text-lg">
-                      {gameResult}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-
-        case "can_join":
-          return (
-            <div className="space-y-3">
-              <div className="text-sm">
-                <span className="font-medium">Created by:</span>
-                <p className="text-xs font-mono break-all mt-1">
-                  {gameData.player1}
-                </p>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium">Status:</span>
-                <p className="text-xs mt-1">Waiting for second player</p>
-              </div>
-              <div className="pt-2">
-                <button
-                  onClick={onJoinGame}
-                  disabled={!canJoinGame}
-                  className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:bg-gray-400"
-                >
-                  Join This Game
-                </button>
-              </div>
-            </div>
-          );
-
-        case "no_game":
-        default:
-          return (
-            <div className="space-y-3">
-              <div className="text-sm text-gray-600">
-                No active games available
-              </div>
-              <div className="text-sm">Create a new game to start playing</div>
-              <div className="pt-2">
-                <button
-                  onClick={onCreateGame}
-                  disabled={!canCreateGame}
-                  className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
-                >
-                  Start New Game
-                </button>
-              </div>
-            </div>
-          );
-      }
-    };
-
-    return (
-      <>
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <h4 className="font-semibold mb-4 text-center">🎮 GAME STATUS</h4>
-          {renderContent(onViewResults)}
-          {displayState !== "no_game" && (
-            <div className="mt-4 pt-3 border-t text-xs text-gray-500 text-center">
-              Game ID: #{gameId ? gameId.toString() : "N/A"}
-            </div>
-          )}
-        </div>
-      </>
-    );
-  }
-
   return (
     <div className="grid w-full gap-4">
       <div className="col-span-full mx-20 bg-black text-white">
@@ -438,86 +219,50 @@ export const RockPaperScissorsDemo = () => {
           </span>
         </p>
       </div>
-      <div className="col-span-full mx-20 mt-4 px-5 pb-4 rounded-lg bg-white border-2 border-black">
-        <p className={titleClass}>Chain Infos</p>
-        {printProperty("ChainId", chainId)}
-        {printProperty(
-          "Metamask accounts",
-          accounts
-            ? accounts.length === 0
-              ? "No accounts"
-              : `{ length: ${accounts.length}, [${accounts[0]}, ...] }`
-            : "undefined"
-        )}
-        {printProperty(
-          "Signer",
-          ethersSigner ? ethersSigner.address : "No signer"
-        )}
 
-        <p className={titleClass}>Contract</p>
-        {printProperty("RockPaperScissors", rockPaperScissors.contractAddress)}
-        {printProperty("isDeployed", rockPaperScissors.isDeployed)}
-      </div>
+      <ChainInfoSection
+        chainId={chainId}
+        accounts={accounts}
+        ethersSigner={ethersSigner}
+        contractAddress={rockPaperScissors.contractAddress}
+        isDeployed={rockPaperScissors.isDeployed}
+      />
+
       <div className="col-span-full mx-20">
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
-            <p className={titleClass}>FHEVM instance</p>
-            {printProperty(
-              "Fhevm Instance",
-              fhevmInstance ? "OK" : "undefined"
-            )}
-            {printProperty("Fhevm Status", fhevmStatus)}
-            {printProperty("Fhevm Error", fhevmError ?? "No Error")}
-          </div>
-          <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
-            <p className={titleClass}>Game Status</p>
-            {printProperty(
-              "Game Display State",
-              rockPaperScissors.gameDisplayState
-            )}
-            {printProperty(
-              "Latest Game ID",
-              rockPaperScissors.latestGame?.gameId?.toString()
-            )}
-            {printProperty(
-              "Is Creating Game",
-              rockPaperScissors.isCreatingGame
-            )}
-            {printProperty(
-              "Is Submitting Move",
-              rockPaperScissors.isSubmittingMove
-            )}
-            {printProperty(
-              "Is Resolving Game",
-              rockPaperScissors.isResolvingGame
-            )}
-          </div>
+          <FhevmInstanceSection
+            fhevmInstance={fhevmInstance}
+            fhevmStatus={fhevmStatus}
+            fhevmError={fhevmError ?? null}
+          />
+          <GameStatusSection
+            gameDisplayState={rockPaperScissors.gameDisplayState}
+            latestGameId={rockPaperScissors.latestGame?.gameId?.toString()}
+            isCreatingGame={rockPaperScissors.isCreatingGame}
+            isSubmittingMove={rockPaperScissors.isSubmittingMove}
+            isResolvingGame={rockPaperScissors.isResolvingGame}
+          />
         </div>
       </div>
 
-      {/* Game Status Box */}
-      <div className="col-span-full mx-20 px-4 pb-4 rounded-lg bg-white border-2 border-black">
-        <GameStatusBox
-          displayState={rockPaperScissors.gameDisplayState}
-          gameData={rockPaperScissors.latestGame?.data}
-          gameId={rockPaperScissors.latestGame?.gameId ?? null}
-          onCreateGame={rockPaperScissors.createGame}
-          onJoinGame={handleJoinGame}
-          onSubmitMove={() => setShowMoveSelector(true)}
-          onResolveGame={rockPaperScissors.resolveGame}
-          canCreateGame={rockPaperScissors.canCreateGame ?? false}
-          canJoinGame={rockPaperScissors.canJoinGame ?? false}
-          canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
-          canResolveGame={rockPaperScissors.canResolveGame ?? false}
-          gameResult={gameResult}
-          isViewingResults={isViewingResults}
-          onViewResults={handleViewResults}
-        />
-      </div>
+      <GameStatusBoxSection
+        gameData={rockPaperScissors.latestGame?.data}
+        gameId={rockPaperScissors.latestGame?.gameId ?? null}
+        userAddress={accounts?.[0] as `0x${string}` | undefined}
+        onCreateGame={rockPaperScissors.createGame}
+        onJoinGame={handleJoinGame}
+        onSubmitMove={() => setShowMoveSelector(true)}
+        onResolveGame={rockPaperScissors.resolveGame}
+        canCreateGame={rockPaperScissors.canCreateGame ?? false}
+        canJoinGame={rockPaperScissors.canJoinGame ?? false}
+        canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
+        canResolveGame={rockPaperScissors.canResolveGame ?? false}
+        gameResult={gameResult}
+        isViewingResults={isViewingResults}
+        onViewResults={handleViewResults}
+      />
 
-      <div className="col-span-full mx-20 p-4 rounded-lg bg-white border-2 border-black">
-        {printProperty("Message", rockPaperScissors.message)}
-      </div>
+      <MessageSection message={rockPaperScissors.message} />
 
       {/* Move Selector Modal */}
       {showMoveSelector && (
@@ -533,6 +278,532 @@ export const RockPaperScissorsDemo = () => {
     </div>
   );
 };
+
+function ChainInfoSection({
+  chainId,
+  accounts,
+  ethersSigner,
+  contractAddress,
+  isDeployed,
+}: {
+  chainId: number | undefined;
+  accounts: string[] | undefined;
+  ethersSigner: ethers.Signer | undefined;
+  contractAddress: string | undefined;
+  isDeployed: boolean | undefined;
+}) {
+  return (
+    <div className="col-span-full mx-20 mt-4 px-5 pb-4 rounded-lg bg-white border-2 border-black">
+      <p className="font-semibold text-black text-lg mt-4">Chain Infos</p>
+      {printProperty("ChainId", chainId)}
+      {printProperty(
+        "Metamask accounts",
+        accounts
+          ? accounts.length === 0
+            ? "No accounts"
+            : `{ length: ${accounts.length}, [${accounts[0]}, ...] }`
+          : "undefined"
+      )}
+      {printProperty(
+        "Signer",
+        ethersSigner
+          ? (ethersSigner as any).address || "Signer available"
+          : "No signer"
+      )}
+
+      <p className="font-semibold text-black text-lg mt-4">Contract</p>
+      {printProperty("RockPaperScissors", contractAddress)}
+      {printProperty("isDeployed", isDeployed)}
+    </div>
+  );
+}
+
+function FhevmInstanceSection({
+  fhevmInstance,
+  fhevmStatus,
+  fhevmError,
+}: {
+  fhevmInstance: any;
+  fhevmStatus: string;
+  fhevmError: Error | null;
+}) {
+  return (
+    <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
+      <p className="font-semibold text-black text-lg mt-4">FHEVM instance</p>
+      {printProperty("Fhevm Instance", fhevmInstance ? "OK" : "undefined")}
+      {printProperty("Fhevm Status", fhevmStatus)}
+      {printProperty("Fhevm Error", fhevmError ?? "No Error")}
+    </div>
+  );
+}
+
+function GameStatusSection({
+  gameDisplayState,
+  latestGameId,
+  isCreatingGame,
+  isSubmittingMove,
+  isResolvingGame,
+}: {
+  gameDisplayState: string;
+  latestGameId: string | undefined;
+  isCreatingGame: boolean;
+  isSubmittingMove: boolean;
+  isResolvingGame: boolean;
+}) {
+  return (
+    <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
+      <p className="font-semibold text-black text-lg mt-4">Game Status</p>
+      {printProperty("Game Display State", gameDisplayState)}
+      {printProperty("Latest Game ID", latestGameId)}
+      {printProperty("Is Creating Game", isCreatingGame)}
+      {printProperty("Is Submitting Move", isSubmittingMove)}
+      {printProperty("Is Resolving Game", isResolvingGame)}
+    </div>
+  );
+}
+
+function RoleIndicator({
+  gameData,
+  userAddress,
+}: {
+  gameData: any;
+  userAddress: `0x${string}` | undefined;
+}) {
+  const isPlayer1 = gameData?.player1 === userAddress;
+  const isPlayer2 = gameData?.player2 === userAddress;
+  const canJoin =
+    gameData &&
+    gameData.status === BigInt(0) &&
+    gameData.player2 === "0x0000000000000000000000000000000000000000";
+
+  if (isPlayer1) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Your Role:</span> Player 1
+      </div>
+    );
+  }
+
+  if (isPlayer2) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Your Role:</span> Player 2
+      </div>
+    );
+  }
+
+  if (canJoin) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Available to join</span>
+      </div>
+    );
+  }
+
+  return null; // No role indicator for "no game" state
+}
+
+function OpponentInfo({
+  gameData,
+  userAddress,
+}: {
+  gameData: any;
+  userAddress: `0x${string}` | undefined;
+}) {
+  const isPlayer1 = gameData?.player1 === userAddress;
+  const isPlayer2 = gameData?.player2 === userAddress;
+
+  if (!gameData) return null;
+
+  if (isPlayer1) {
+    const hasOpponent =
+      gameData.player2 &&
+      gameData.player2 !== "0x0000000000000000000000000000000000000000";
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Opponent:</span>
+        <p className="text-xs font-mono break-all mt-1">
+          {hasOpponent ? gameData.player2 : "Waiting for opponent"}
+        </p>
+      </div>
+    );
+  }
+
+  if (isPlayer2) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Opponent:</span>
+        <p className="text-xs font-mono break-all mt-1">{gameData.player1}</p>
+      </div>
+    );
+  }
+
+  // Can join view - show creator
+  return (
+    <div className="text-sm">
+      <span className="font-medium">Created by:</span>
+      <p className="text-xs font-mono break-all mt-1">{gameData.player1}</p>
+    </div>
+  );
+}
+
+function StatusIndicator({
+  gameData,
+  userAddress,
+}: {
+  gameData: any;
+  userAddress: `0x${string}` | undefined;
+}) {
+  if (!gameData) {
+    return (
+      <div className="text-sm text-gray-600">No active games available</div>
+    );
+  }
+
+  const isPlayer2 = gameData.player2 === userAddress;
+  const canJoin =
+    gameData.status === BigInt(0) &&
+    gameData.player2 === "0x0000000000000000000000000000000000000000";
+
+  if (canJoin) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Status:</span>
+        <p className="text-xs mt-1">Waiting for second player</p>
+      </div>
+    );
+  }
+
+  if (isPlayer2) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Status:</span>
+        <p className="text-xs mt-1">Move submitted - waiting for results</p>
+      </div>
+    );
+  }
+
+  if (gameData.status === BigInt(0)) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Status:</span>
+        <p className="text-xs mt-1">Waiting for moves</p>
+      </div>
+    );
+  }
+
+  if (gameData.status === BigInt(1)) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Status:</span>
+        <p className="text-xs mt-1">Moves submitted - can resolve</p>
+      </div>
+    );
+  }
+
+  if (gameData.status === BigInt(2)) {
+    return (
+      <div className="text-sm">
+        <span className="font-medium">Status:</span>
+        <p className="text-xs mt-1">Game resolved</p>
+      </div>
+    );
+  }
+
+  // Fallback for no game state
+  return <div className="text-sm">Create a new game to start playing</div>;
+}
+
+function ActionButtons({
+  gameData,
+  userAddress,
+  onCreateGame,
+  onJoinGame,
+  onSubmitMove,
+  onResolveGame,
+  canCreateGame,
+  canJoinGame,
+  canSubmitMove,
+  canResolveGame,
+  onViewResults,
+  isViewingResults,
+}: {
+  gameData: any;
+  userAddress: `0x${string}` | undefined;
+  onCreateGame: () => void;
+  onJoinGame: () => void;
+  onSubmitMove: () => void;
+  onResolveGame: () => void;
+  canCreateGame: boolean;
+  canJoinGame: boolean;
+  canSubmitMove: boolean;
+  canResolveGame: boolean;
+  onViewResults: () => void;
+  isViewingResults: boolean;
+}) {
+  if (!gameData) {
+    // No game state - show start new game
+    return (
+      <div className="pt-2">
+        <button
+          onClick={onCreateGame}
+          disabled={!canCreateGame}
+          className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
+        >
+          Start New Game
+        </button>
+      </div>
+    );
+  }
+
+  const isPlayer2 = gameData.player2 === userAddress;
+  const canJoin =
+    gameData.status === BigInt(0) &&
+    gameData.player2 === "0x0000000000000000000000000000000000000000";
+
+  if (canJoin) {
+    // Can join existing game
+    return (
+      <div className="pt-2">
+        <button
+          onClick={onJoinGame}
+          disabled={!canJoinGame}
+          className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:bg-gray-400"
+        >
+          Join This Game
+        </button>
+      </div>
+    );
+  }
+
+  if (isPlayer2) {
+    // Player 2 - always show view results and new game buttons
+    return (
+      <div className="pt-2 space-y-2">
+        <div className="flex gap-2">
+          <button
+            onClick={onViewResults}
+            disabled={isViewingResults}
+            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+          >
+            {isViewingResults ? "Decrypting..." : "View Results"}
+          </button>
+          <button
+            onClick={onCreateGame}
+            disabled={!canCreateGame}
+            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
+          >
+            New Game
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Player 1 logic based on status
+  if (gameData.status === BigInt(0)) {
+    // Waiting for moves - show submit move
+    return (
+      <div className="pt-2 space-y-2">
+        <button
+          onClick={onSubmitMove}
+          disabled={!canSubmitMove}
+          className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          Submit Your Move
+        </button>
+      </div>
+    );
+  }
+
+  if (gameData.status === BigInt(1)) {
+    // Moves submitted - show resolve
+    return (
+      <div className="pt-2 space-y-2">
+        <button
+          onClick={onResolveGame}
+          disabled={!canResolveGame}
+          className="w-full bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:bg-gray-400"
+        >
+          Resolve Game
+        </button>
+      </div>
+    );
+  }
+
+  if (gameData.status === BigInt(2)) {
+    // Game resolved - show view results and new game
+    return (
+      <div className="pt-2 space-y-2">
+        <div className="flex gap-2">
+          <button
+            onClick={onViewResults}
+            disabled={isViewingResults}
+            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+          >
+            {isViewingResults ? "Decrypting..." : "View Results"}
+          </button>
+          <button
+            onClick={onCreateGame}
+            disabled={!canCreateGame}
+            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
+          >
+            New Game
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback
+  return (
+    <div className="pt-2">
+      <button
+        onClick={onCreateGame}
+        disabled={!canCreateGame}
+        className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
+      >
+        Start New Game
+      </button>
+    </div>
+  );
+}
+
+function GameResult({ gameResult }: { gameResult: string | null }) {
+  if (!gameResult) return null;
+
+  return (
+    <div className="w-full bg-green-100 border border-green-300 rounded p-3 text-center">
+      <p className="text-green-800 font-semibold text-lg">{gameResult}</p>
+    </div>
+  );
+}
+
+function GameStatusBox({
+  gameData,
+  gameId,
+  userAddress,
+  onCreateGame,
+  onJoinGame,
+  onSubmitMove,
+  onResolveGame,
+  canCreateGame,
+  canJoinGame,
+  canSubmitMove,
+  canResolveGame,
+  gameResult,
+  isViewingResults,
+  onViewResults,
+}: {
+  gameData: any;
+  gameId: bigint | null;
+  userAddress: `0x${string}` | undefined;
+  onCreateGame: () => void;
+  onJoinGame: () => void;
+  onSubmitMove: () => void;
+  onResolveGame: () => void;
+  canCreateGame: boolean;
+  canJoinGame: boolean;
+  canSubmitMove: boolean;
+  canResolveGame: boolean;
+  gameResult: string | null;
+  isViewingResults: boolean;
+  onViewResults: () => void;
+}) {
+  return (
+    <>
+      <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <h4 className="font-semibold mb-4 text-center">🎮 GAME STATUS</h4>
+        <div className="space-y-3">
+          <RoleIndicator gameData={gameData} userAddress={userAddress} />
+          <OpponentInfo gameData={gameData} userAddress={userAddress} />
+          <StatusIndicator gameData={gameData} userAddress={userAddress} />
+          <ActionButtons
+            gameData={gameData}
+            userAddress={userAddress}
+            onCreateGame={onCreateGame}
+            onJoinGame={onJoinGame}
+            onSubmitMove={onSubmitMove}
+            onResolveGame={onResolveGame}
+            canCreateGame={canCreateGame}
+            canJoinGame={canJoinGame}
+            canSubmitMove={canSubmitMove}
+            canResolveGame={canResolveGame}
+            onViewResults={onViewResults}
+            isViewingResults={isViewingResults}
+          />
+          <GameResult gameResult={gameResult} />
+        </div>
+        {gameData && (
+          <div className="mt-4 pt-3 border-t text-xs text-gray-500 text-center">
+            Game ID: #{gameId ? gameId.toString() : "N/A"}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function GameStatusBoxSection({
+  gameData,
+  gameId,
+  userAddress,
+  onCreateGame,
+  onJoinGame,
+  onSubmitMove,
+  onResolveGame,
+  canCreateGame,
+  canJoinGame,
+  canSubmitMove,
+  canResolveGame,
+  gameResult,
+  isViewingResults,
+  onViewResults,
+}: {
+  gameData: any;
+  gameId: bigint | null;
+  userAddress: `0x${string}` | undefined;
+  onCreateGame: () => void;
+  onJoinGame: () => void;
+  onSubmitMove: () => void;
+  onResolveGame: () => void;
+  canCreateGame: boolean;
+  canJoinGame: boolean;
+  canSubmitMove: boolean;
+  canResolveGame: boolean;
+  gameResult: string | null;
+  isViewingResults: boolean;
+  onViewResults: () => void;
+}) {
+  return (
+    <div className="col-span-full mx-20 px-4 pb-4 rounded-lg bg-white border-2 border-black">
+      <GameStatusBox
+        gameData={gameData}
+        gameId={gameId}
+        userAddress={userAddress}
+        onCreateGame={onCreateGame}
+        onJoinGame={onJoinGame}
+        onSubmitMove={onSubmitMove}
+        onResolveGame={onResolveGame}
+        canCreateGame={canCreateGame}
+        canJoinGame={canJoinGame}
+        canSubmitMove={canSubmitMove}
+        canResolveGame={canResolveGame}
+        gameResult={gameResult}
+        isViewingResults={isViewingResults}
+        onViewResults={onViewResults}
+      />
+    </div>
+  );
+}
+
+function MessageSection({ message }: { message: string }) {
+  return (
+    <div className="col-span-full mx-20 p-4 rounded-lg bg-white border-2 border-black">
+      {printProperty("Message", message)}
+    </div>
+  );
+}
 
 function MoveSelectorModal({
   modalMode,

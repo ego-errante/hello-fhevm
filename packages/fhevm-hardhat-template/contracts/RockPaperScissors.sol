@@ -11,7 +11,7 @@ contract RockPaperScissors is SepoliaConfig {
     /// @notice Game status enumeration
     enum GameStatus {
         Created, // Game created, waiting for second player
-        MovesSubmitted, // Both players have submitted moves
+        Player1MoveSubmitted, // Player1 submitted move, waiting for player 2
         Resolved // Game has been resolved with encrypted result accessible to players
     }
 
@@ -23,7 +23,6 @@ contract RockPaperScissors is SepoliaConfig {
         euint8 move2; // Encrypted move of player2
         euint8 result; // Encrypted result: 0=draw, 1=player1 wins, 2=player2 wins
         GameStatus status;
-        bool player1Submitted; // Track if player1 has submitted their move
         uint256 createdAt;
         uint256 resolvedAt;
     }
@@ -49,7 +48,6 @@ contract RockPaperScissors is SepoliaConfig {
         _games[gameId].player2 = address(0);
         // move1, move2, result remain uninitialized (ZeroHash by default)
         _games[gameId].status = GameStatus.Created;
-        _games[gameId].player1Submitted = false;
         _games[gameId].createdAt = block.timestamp;
         _games[gameId].resolvedAt = 0;
         // _games[gameId] = Game({
@@ -75,7 +73,6 @@ contract RockPaperScissors is SepoliaConfig {
     /// @return move2 Encrypted move of player 2
     /// @return result Encrypted game result
     /// @return status Current game status
-    /// @return player1Submitted Whether player1 has submitted their move
     /// @return createdAt Timestamp when game was created
     /// @return resolvedAt Timestamp when game was resolved
     function getGame(
@@ -90,7 +87,6 @@ contract RockPaperScissors is SepoliaConfig {
             euint8 move2,
             euint8 result,
             GameStatus status,
-            bool player1Submitted,
             uint256 createdAt,
             uint256 resolvedAt
         )
@@ -105,7 +101,6 @@ contract RockPaperScissors is SepoliaConfig {
             game.move2,
             game.result,
             game.status,
-            game.player1Submitted,
             game.createdAt,
             game.resolvedAt
         );
@@ -118,7 +113,7 @@ contract RockPaperScissors is SepoliaConfig {
     function submitEncryptedMove(uint256 gameId, externalEuint8 encryptedMove, bytes calldata inputProof) external {
         Game storage game = _games[gameId];
         require(game.player1 != address(0), "Game does not exist");
-        require(game.status == GameStatus.Created, "Game is not in correct state for move submission");
+        require(game.status != GameStatus.Resolved, "Game is already resolved");
 
         euint8 move = FHE.fromExternal(encryptedMove, inputProof);
 
@@ -131,18 +126,20 @@ contract RockPaperScissors is SepoliaConfig {
 
         if (msg.sender == game.player1) {
             // Player 1 is submitting their move
-            require(!game.player1Submitted, "Player1 move already submitted");
+            require(game.status == GameStatus.Created, "Player1 can only submit in Created state");
             game.move1 = validatedMove;
-            game.player1Submitted = true;
+            game.status = GameStatus.Player1MoveSubmitted;
         } else {
             // This could be player 2 joining and submitting move
-            require(game.player1Submitted, "Player1 must submit their move before Player2 can join");
+            require(game.status == GameStatus.Player1MoveSubmitted, "Player1 must submit their move first");
             if (game.player2 == address(0)) {
                 game.player2 = msg.sender;
             } else {
                 require(msg.sender == game.player2, "Only player1 or player2 can submit moves");
             }
             game.move2 = validatedMove;
+            // When player 2 submits their move, we can immediately resolve the game.
+            _resolveGame(gameId, game);
         }
 
         // Allow the contract to use this move in future computations
@@ -151,13 +148,6 @@ contract RockPaperScissors is SepoliaConfig {
         FHE.allow(validatedMove, msg.sender);
 
         emit MoveSubmitted(gameId, msg.sender);
-
-        // Check if both moves have been submitted
-        // Now we can properly verify both players have submitted
-        if (game.player1Submitted && game.player2 != address(0)) {
-            // Auto-resolve the game when both moves are submitted
-            _resolveGame(gameId, game);
-        }
     }
 
     /// @notice Internal function to resolve the game and compute the encrypted result
@@ -216,15 +206,6 @@ contract RockPaperScissors is SepoliaConfig {
         emit GameResolved(gameId);
     }
 
-    /// @notice Resolves the game and computes the encrypted result (public wrapper for manual resolution if needed)
-    /// @param gameId The game identifier
-    function resolveGame(uint256 gameId) external {
-        Game storage game = _games[gameId];
-        require(game.player1 != address(0), "Game does not exist");
-        require(game.status == GameStatus.MovesSubmitted, "Both players must have submitted moves");
-
-        _resolveGame(gameId, game);
-    }
 
     /// @notice Gets the encrypted game result for client-side decryption
     /// @param gameId The game identifier
@@ -233,7 +214,6 @@ contract RockPaperScissors is SepoliaConfig {
         Game storage game = _games[gameId];
         require(game.player1 != address(0), "Game does not exist");
         require(game.status == GameStatus.Resolved, "Game must be resolved first");
-        require(msg.sender == game.player1 || msg.sender == game.player2, "Only game participants can view the result");
 
         return game.result;
     }
@@ -246,12 +226,6 @@ contract RockPaperScissors is SepoliaConfig {
         Game storage game = _games[gameId];
         require(game.player1 != address(0), "Game does not exist");
         require(game.status == GameStatus.Resolved, "Game must be resolved first");
-
-        // Only players can access the encrypted game data
-        require(
-            msg.sender == game.player1 || msg.sender == game.player2,
-            "Only game participants can access game data"
-        );
 
         return game.result;
     }
