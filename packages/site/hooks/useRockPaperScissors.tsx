@@ -33,7 +33,7 @@ export type GameData = {
   move1: string;
   move2: string;
   result: string;
-  status: number;
+  status: bigint;
   player1Submitted: boolean;
   createdAt: bigint;
   resolvedAt: bigint;
@@ -137,6 +137,8 @@ export const useRockPaperScissors = (parameters: {
       setMessage(
         `RockPaperScissors deployment not found for chainId=${chainId}.`
       );
+    } else {
+      setMessage("");
     }
 
     return c;
@@ -254,10 +256,15 @@ export const useRockPaperScissors = (parameters: {
   //////////////////////////////////////////////////////////////////////////////
 
   const gameDisplayState = useMemo(() => {
-    if (!userAddress || !latestGame) return "no_game";
+    if (!userAddress || !latestGame) {
+      return "no_game";
+    }
 
     const { data: gameData } = latestGame;
-    if (!gameData) return "no_game";
+    if (!gameData) {
+      console.log("gameDisplayState: no_game (no gameData)");
+      return "no_game";
+    }
 
     const isPlayer1 =
       gameData.player1?.toLowerCase() === userAddress?.toLowerCase();
@@ -265,15 +272,24 @@ export const useRockPaperScissors = (parameters: {
       gameData.player2 &&
       gameData.player2?.toLowerCase() === userAddress?.toLowerCase();
     const canJoin =
-      gameData.status === 0 &&
+      gameData.status === BigInt(0) &&
       (!gameData.player2 || gameData.player2 === ethers.ZeroAddress);
 
-    if (isPlayer1) return "player1";
-    if (isPlayer2) return "player2";
-    if (canJoin) return "can_join";
+    if (isPlayer1) {
+      return "player1";
+    }
+    if (isPlayer2) {
+      return "player2";
+    }
+    if (canJoin) {
+      return "can_join";
+    }
 
     return "no_game";
   }, [userAddress, latestGame]);
+
+  // console.log("[useRockPaperScissors] ======");
+  // console.log("[useRockPaperScissors] gameDisplayState", gameDisplayState);
 
   //////////////////////////////////////////////////////////////////////////////
   // Contract Interaction State
@@ -288,7 +304,7 @@ export const useRockPaperScissors = (parameters: {
       rockPaperScissors.address &&
       ethersSigner &&
       !isCreatingGame &&
-      gameDisplayState === "no_game"
+      Number(latestGame?.data?.result) !== 0
     );
   }, [
     rockPaperScissors.address,
@@ -489,6 +505,7 @@ export const useRockPaperScissors = (parameters: {
           !sameChain.current(thisChainId) ||
           !sameSigner.current(thisEthersSigner);
 
+        console.log("move: ", move);
         const encryptedMove = await instance
           .createEncryptedInput(
             thisRockPaperScissorsAddress,
@@ -548,7 +565,7 @@ export const useRockPaperScissors = (parameters: {
       !isResolvingGame &&
       gameDisplayState === "player1" &&
       latestGame?.data &&
-      latestGame.data.status === 1 // Moves submitted
+      latestGame.data.status === BigInt(1) // Moves submitted
     );
   }, [
     rockPaperScissors.address,
@@ -637,6 +654,49 @@ export const useRockPaperScissors = (parameters: {
     isLoadingGamesRef.current = isLoadingGames;
   }, [isLoadingGames]);
 
+  // Generate decryption signature when needed (called from component)
+  const generateDecryptionSignature = useCallback(async () => {
+    if (
+      !instance ||
+      !ethersSigner ||
+      !rockPaperScissors.address ||
+      !fhevmDecryptionSignatureStorage
+    ) {
+      return;
+    }
+
+    try {
+      // Try to load existing signature first
+      const existingSignature =
+        await FhevmDecryptionSignature.loadFromGenericStringStorage(
+          fhevmDecryptionSignatureStorage,
+          instance,
+          [rockPaperScissors.address],
+          ethersSigner.address
+        );
+
+      if (!existingSignature) {
+        // Generate new signature if none exists
+        await FhevmDecryptionSignature.loadOrSign(
+          instance,
+          [rockPaperScissors.address],
+          ethersSigner,
+          fhevmDecryptionSignatureStorage
+        );
+        console.log("Generated new decryption signature");
+      } else {
+        console.log("Using existing decryption signature");
+      }
+    } catch (error) {
+      console.error("Failed to generate/load decryption signature:", error);
+    }
+  }, [
+    instance,
+    ethersSigner,
+    rockPaperScissors.address,
+    fhevmDecryptionSignatureStorage,
+  ]);
+
   return {
     // Contract info
     contractAddress: rockPaperScissors.address,
@@ -655,6 +715,7 @@ export const useRockPaperScissors = (parameters: {
     submitEncryptedMove,
     canResolveGame,
     resolveGame,
+    generateDecryptionSignature,
 
     // Status
     message,

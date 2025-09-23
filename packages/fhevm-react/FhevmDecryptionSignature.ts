@@ -40,7 +40,10 @@ class FhevmDecryptionSignatureStorageKey {
     try {
       const hash = ethers.TypedDataEncoder.hash(
         emptyEIP712.domain,
-        { UserDecryptRequestVerification: emptyEIP712.types.UserDecryptRequestVerification },
+        {
+          UserDecryptRequestVerification:
+            emptyEIP712.types.UserDecryptRequestVerification,
+        },
         emptyEIP712.message
       );
 
@@ -299,7 +302,10 @@ export class FhevmDecryptionSignature {
       );
       const signature = await signer.signTypedData(
         eip712.domain,
-        { UserDecryptRequestVerification: eip712.types.UserDecryptRequestVerification },
+        {
+          UserDecryptRequestVerification:
+            eip712.types.UserDecryptRequestVerification,
+        },
         eip712.message
       );
       return new FhevmDecryptionSignature({
@@ -335,6 +341,7 @@ export class FhevmDecryptionSignature {
         keyPair?.publicKey
       );
 
+    console.log("cached", cached);
     if (cached) {
       return cached;
     }
@@ -348,6 +355,7 @@ export class FhevmDecryptionSignature {
       privateKey,
       signer
     );
+    console.log("sig", sig);
 
     if (!sig) {
       return null;

@@ -51,7 +51,6 @@ export interface UseMetaMaskState {
   isConnected: boolean;
   error: Error | undefined;
   connect: () => void;
-  disconnect: () => void;
 }
 
 function useMetaMaskInternal(): UseMetaMaskState {
@@ -81,10 +80,6 @@ function useMetaMaskInternal(): UseMetaMaskState {
   const hasAccounts = (accounts?.length ?? 0) > 0;
   const hasChain = typeof chainId === "number";
 
-  console.log("hasProvider:", hasProvider);
-  console.log("hasAccounts:", hasAccounts);
-  console.log("hasChain:", hasChain);
-
   const isConnected = hasProvider && hasAccounts && hasChain;
 
   const connect = useCallback(() => {
@@ -101,71 +96,40 @@ function useMetaMaskInternal(): UseMetaMaskState {
     _currentProvider.request({ method: "eth_requestAccounts" });
   }, [_currentProvider, accounts]);
 
-  const disconnect = useCallback(() => {
-    // // Reset connection state to simulate disconnect
-    // _setCurrentProvider(undefined);
-    // _setChainId(undefined);
-    // _setAccounts(undefined);
-
-    _currentProvider?.request({ method: "eth_logout" });
-  }, []);
-
   useEffect(() => {
-    console.log("[useMetaMask] useEffect triggered with providers:", providers);
-
     let next: Eip1193ProviderWithEvent | undefined = undefined;
     for (let i = 0; i < providers.length; ++i) {
-      console.log(
-        `[useMetaMask] Checking provider[${i}]:`,
-        providers[i].info.name
-      );
       if (providers[i].info.name.toLowerCase() === "metamask") {
         next = providers[i].provider;
-        console.log(
-          `[useMetaMask] Found MetaMask provider at index ${i}:`,
-          next
-        );
         break;
       }
     }
 
     const prev = metaMaskProviderRef.current;
     if (prev === next) {
-      console.log(
-        "[useMetaMask] No change in MetaMask provider, skipping effect."
-      );
       return;
     }
 
     if (prev) {
-      console.log(
-        "[useMetaMask] Cleaning up previous MetaMask provider listeners:",
-        prev
-      );
-
       if (connectListenerRef.current) {
-        console.log("[useMetaMask] Removing previous connect listener");
         prev.off?.("connect", connectListenerRef.current);
         prev.removeListener?.("connect", connectListenerRef.current);
         connectListenerRef.current = undefined;
       }
 
       if (disconnectListenerRef.current) {
-        console.log("[useMetaMask] Removing previous disconnect listener");
         prev.off?.("disconnect", disconnectListenerRef.current);
         prev.removeListener?.("disconnect", disconnectListenerRef.current);
         disconnectListenerRef.current = undefined;
       }
 
       if (chainChangedListenerRef.current) {
-        console.log("[useMetaMask] Removing previous chainChanged listener");
         prev.off?.("chainChanged", chainChangedListenerRef.current);
         prev.removeListener?.("chainChanged", chainChangedListenerRef.current);
         chainChangedListenerRef.current = undefined;
       }
 
       if (accountsChangedListenerRef.current) {
-        console.log("[useMetaMask] Removing previous accountsChanged listener");
         prev.off?.("accountsChanged", accountsChangedListenerRef.current);
         prev.removeListener?.(
           "accountsChanged",
@@ -175,9 +139,6 @@ function useMetaMaskInternal(): UseMetaMaskState {
       }
     }
 
-    console.log(
-      "[useMetaMask] Resetting provider, chainId, and accounts state."
-    );
     _setCurrentProvider(undefined);
     _setChainId(undefined);
     _setAccounts(undefined);
@@ -197,24 +158,11 @@ function useMetaMaskInternal(): UseMetaMaskState {
     accountsChangedListenerRef.current = undefined;
 
     if (next) {
-      console.log(
-        "[useMetaMask] Setting up listeners for new MetaMask provider:",
-        next
-      );
-
       // Connect
       nextConnectListener = (connectInfo: ProviderConnectInfo) => {
         if (next !== metaMaskProviderRef.current) {
-          console.log(
-            "[useMetaMask] Ignoring connect event for stale provider."
-          );
           return;
         }
-        console.log(
-          `[useMetaMask] on('connect') chainId=${connectInfo.chainId}`,
-          connectInfo
-        );
-        // Synchronize provider and chainId
         _setCurrentProvider(next);
         _setChainId(Number.parseInt(connectInfo.chainId, 16));
       };
@@ -223,16 +171,8 @@ function useMetaMaskInternal(): UseMetaMaskState {
       // Disconnect
       nextDisconnectListener = (error: ProviderRpcError) => {
         if (next !== metaMaskProviderRef.current) {
-          console.log(
-            "[useMetaMask] Ignoring disconnect event for stale provider."
-          );
           return;
         }
-        console.log(
-          `[useMetaMask] on('disconnect') error code=${error.code}`,
-          error
-        );
-        // Synchronize provider and chainId
         _setCurrentProvider(undefined);
         _setChainId(undefined);
         _setAccounts(undefined);
@@ -242,13 +182,8 @@ function useMetaMaskInternal(): UseMetaMaskState {
       // ChainChanged
       nextChainChangedListener = (chainId: string) => {
         if (next !== metaMaskProviderRef.current) {
-          console.log(
-            "[useMetaMask] Ignoring chainChanged event for stale provider."
-          );
           return;
         }
-        console.log(`[useMetaMask] on('chainChanged') chainId=${chainId}`);
-        // Synchronize provider and chainId
         _setCurrentProvider(next);
         _setChainId(Number.parseInt(chainId, 16));
       };
@@ -257,15 +192,8 @@ function useMetaMaskInternal(): UseMetaMaskState {
       // AccountsChanged
       nextAccountsChangedListener = (accounts: string[]) => {
         if (next !== metaMaskProviderRef.current) {
-          console.log(
-            "[useMetaMask] Ignoring accountsChanged event for stale provider."
-          );
           return;
         }
-        console.log(
-          `[useMetaMask] on('accountsChanged') accounts.length=${accounts.length}`,
-          accounts
-        );
         _setCurrentProvider(next);
         _setAccounts(accounts);
       };
@@ -273,13 +201,11 @@ function useMetaMaskInternal(): UseMetaMaskState {
 
       // One or the other
       if (next.on) {
-        console.log("[useMetaMask] Using .on to add event listeners.");
         next.on("connect", nextConnectListener);
         next.on("disconnect", nextDisconnectListener);
         next.on("chainChanged", nextChainChangedListener);
         next.on?.("accountsChanged", nextAccountsChangedListener);
       } else {
-        console.log("[useMetaMask] Using .addListener to add event listeners.");
         next.addListener?.("connect", nextConnectListener);
         next.addListener?.("disconnect", nextDisconnectListener);
         next.addListener?.("chainChanged", nextChainChangedListener);
@@ -288,29 +214,19 @@ function useMetaMaskInternal(): UseMetaMaskState {
 
       const updateChainId = async () => {
         if (next !== metaMaskProviderRef.current) {
-          console.log("[useMetaMask] updateChainId: stale provider, aborting.");
           return;
         }
 
         try {
-          console.log(
-            "[useMetaMask] updateChainId: requesting eth_chainId and eth_accounts..."
-          );
           const [chainIdHex, accountsArray] = await Promise.all([
             next.request({ method: "eth_chainId" }),
             next.request({ method: "eth_accounts" }),
           ]);
 
-          console.log(
-            `[useMetaMask] connected to chainId=${chainIdHex} accounts.length=${accountsArray.length}`,
-            { chainIdHex, accountsArray }
-          );
-
           _setCurrentProvider(next);
           _setChainId(Number.parseInt(chainIdHex, 16));
           _setAccounts(accountsArray);
         } catch (err) {
-          console.log(`[useMetaMask] not connected! Error:`, err);
           _setCurrentProvider(next);
           _setChainId(undefined);
           _setAccounts(undefined);
@@ -318,10 +234,6 @@ function useMetaMaskInternal(): UseMetaMaskState {
       };
 
       updateChainId();
-    } else {
-      console.log(
-        "[useMetaMask] No MetaMask provider found in providers array."
-      );
     }
   }, [providers]);
 
@@ -366,7 +278,6 @@ function useMetaMaskInternal(): UseMetaMaskState {
     isConnected,
     error: eip6963Error,
     connect,
-    disconnect,
   };
 }
 
@@ -379,15 +290,8 @@ const MetaMaskContext = createContext<UseMetaMaskState | undefined>(undefined);
 export const MetaMaskProvider: React.FC<MetaMaskProviderProps> = ({
   children,
 }) => {
-  const {
-    provider,
-    chainId,
-    accounts,
-    isConnected,
-    error,
-    connect,
-    disconnect,
-  } = useMetaMaskInternal();
+  const { provider, chainId, accounts, isConnected, error, connect } =
+    useMetaMaskInternal();
   return (
     <MetaMaskContext.Provider
       value={{
@@ -397,7 +301,6 @@ export const MetaMaskProvider: React.FC<MetaMaskProviderProps> = ({
         isConnected,
         error,
         connect,
-        disconnect,
       }}
     >
       {children}
