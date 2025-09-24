@@ -203,8 +203,7 @@ const useRockPaperScissors = (params: any) => {
             : 2
       ),
       createdAt: Date.now() / 1000,
-      resolvedAt:
-        gameState === "resolved" ? BigInt(Date.now() / 1000) : BigInt(0),
+      resolvedAt: gameState === "resolved" ? Date.now() / 1000 : 0,
     };
 
     return baseData;
@@ -266,10 +265,50 @@ const useRockPaperScissors = (params: any) => {
           ? "Waiting for Moves"
           : "Game Resolved";
 
+  // Determine user game role based on current state and user address
+  const getUserGameRole = () => {
+    if (gameState === "no_game") return "no_role";
+    if (userRole === "player1") return "player1";
+    if (userRole === "player2") return "player2";
+    return "no_role";
+  };
+
+  const userGameRole = getUserGameRole();
+
   const canCreateGame = gameState === "no_game" && !isCreatingGame;
   const canSubmitMove =
     (gameState === "waiting_moves" && userRole === "player1") ||
     (gameState === "waiting_player2" && userRole === "none");
+  const canJoinGame = gameState === "waiting_player2" && userRole === "none";
+
+  // Demo control functions
+  const setDemoGameState = (
+    newState: "no_game" | "waiting_player2" | "waiting_moves" | "resolved"
+  ) => {
+    setGameState(newState);
+    if (newState === "no_game") {
+      setUserRole("none");
+      setLatestGameId(null);
+      setMessage("Demo: Reset to no game state");
+    } else if (newState === "waiting_player2") {
+      setUserRole("player1");
+      setLatestGameId(BigInt(Math.floor(Math.random() * 1000)));
+      setMessage("Demo: Game created, waiting for Player 2");
+    } else if (newState === "waiting_moves") {
+      setUserRole("player1");
+      setLatestGameId(latestGameId || BigInt(Math.floor(Math.random() * 1000)));
+      setMessage("Demo: Both players joined, waiting for moves");
+    } else if (newState === "resolved") {
+      setUserRole("player1");
+      setLatestGameId(latestGameId || BigInt(Math.floor(Math.random() * 1000)));
+      setMessage("Demo: Game resolved");
+    }
+  };
+
+  const setDemoUserRole = (role: "player1" | "player2" | "none") => {
+    setUserRole(role);
+    setMessage(`Demo: Set user role to ${role}`);
+  };
 
   return {
     contractAddress: mockContractAddress,
@@ -285,6 +324,11 @@ const useRockPaperScissors = (params: any) => {
     isCreatingGame,
     isSubmittingMove,
     isLoadingGames: false,
+    userGameRole,
+    canJoinGame,
+    // Demo controls
+    setDemoGameState,
+    setDemoUserRole,
   };
 };
 
@@ -394,43 +438,46 @@ function FhevmInstanceSection({
   );
 }
 
-function GameStatusSection({
-  gameDisplayState,
-  latestGameId,
-  isCreatingGame,
-  isSubmittingMove,
-}: {
-  gameDisplayState: string;
-  latestGameId: string | undefined;
-  isCreatingGame: boolean;
-  isSubmittingMove: boolean;
-}) {
+function HowToPlaySection() {
   return (
     <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
-      <p className="font-semibold text-black text-lg mt-4">Game Status</p>
-      {printProperty("Game Display State", gameDisplayState)}
-      {printProperty("Latest Game ID", latestGameId)}
-      {printProperty("Is Creating Game", isCreatingGame)}
-      {printProperty("Is Submitting Move", isSubmittingMove)}
+      <p className="font-semibold text-black text-lg mt-4">How to Play</p>
+
+      <div className="mt-3 space-y-6 text-sm">
+        <div>
+          <p className="font-semibold mb-1">Game Rules:</p>
+          <p>
+            This is an onchain implementation of the classic Rock Paper Scissors
+            game using FHE. Only the final result is available to both players.
+          </p>
+        </div>
+
+        <div>
+          <p className="font-semibold mb-1">Privacy Features:</p>
+          <ul className="text-gray-700 space-y-1">
+            <li>• Moves are encrypted using FHE</li>
+            <li>• Individual moves stay private</li>
+            <li>• Only the final result is revealed</li>
+          </ul>
+        </div>
+
+        <div>
+          <p className="font-semibold mb-1">How to Play:</p>
+          <ol className="text-gray-700 space-y-1">
+            <li>1. Player 1 creates a new game</li>
+            <li>2. Player 1 submits their encrypted move</li>
+            <li>3. Player 2 joins and submits their move</li>
+            <li>4. Game automatically resolves</li>
+            <li>5. Both players can view the result</li>
+          </ol>
+        </div>
+      </div>
     </div>
   );
 }
 
-function RoleIndicator({
-  gameData,
-  userAddress,
-}: {
-  gameData: any;
-  userAddress: `0x${string}` | undefined;
-}) {
-  const isPlayer1 = gameData?.player1 === userAddress;
-  const isPlayer2 = gameData?.player2 === userAddress;
-  const canJoin =
-    gameData &&
-    gameData.status === BigInt(1) &&
-    gameData.player2 === "0x0000000000000000000000000000000000000000";
-
-  if (isPlayer1) {
+function RoleIndicator({ userGameRole }: { userGameRole: string }) {
+  if (userGameRole === "player1") {
     return (
       <div className="text-sm">
         <span className="font-medium">Your Role:</span> Player 1
@@ -438,7 +485,7 @@ function RoleIndicator({
     );
   }
 
-  if (isPlayer2) {
+  if (userGameRole === "player2") {
     return (
       <div className="text-sm">
         <span className="font-medium">Your Role:</span> Player 2
@@ -446,7 +493,9 @@ function RoleIndicator({
     );
   }
 
-  if (canJoin) {
+  // Check if user can join (when game status is 1 and player2 slot is empty)
+  // This is handled by the hook's canSubmitMove logic, but we show "Available to join" for no_role users
+  if (userGameRole === "no_role") {
     return (
       <div className="text-sm">
         <span className="font-medium">Available to join</span>
@@ -454,22 +503,21 @@ function RoleIndicator({
     );
   }
 
-  return null; // No role indicator for "no game" state
+  return null;
 }
 
 function OpponentInfo({
   gameData,
   userAddress,
+  userGameRole,
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
 }) {
-  const isPlayer1 = gameData?.player1 === userAddress;
-  const isPlayer2 = gameData?.player2 === userAddress;
-
   if (!gameData) return null;
 
-  if (isPlayer1) {
+  if (userGameRole === "player1") {
     const hasOpponent =
       gameData.player2 &&
       gameData.player2 !== "0x0000000000000000000000000000000000000000";
@@ -483,7 +531,7 @@ function OpponentInfo({
     );
   }
 
-  if (isPlayer2) {
+  if (userGameRole === "player2") {
     return (
       <div className="text-sm">
         <span className="font-medium">Opponent:</span>
@@ -504,9 +552,11 @@ function OpponentInfo({
 function StatusIndicator({
   gameData,
   userAddress,
+  userGameRole,
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
 }) {
   if (!gameData) {
     return (
@@ -514,22 +564,21 @@ function StatusIndicator({
     );
   }
 
-  const isPlayer1 = gameData.player1 === userAddress;
-  const isPlayer2 = gameData.player2 === userAddress;
-
   if (gameData.status === BigInt(0)) {
     return (
       <div className="text-sm">
         <span className="font-medium">Status:</span>
         <p className="text-xs mt-1">
-          {isPlayer1 ? "Submit your move" : "Waiting for Player 1's move"}
+          {userGameRole === "player1"
+            ? "Submit your move"
+            : "Waiting for Player 1's move"}
         </p>
       </div>
     );
   }
 
   if (gameData.status === BigInt(1)) {
-    if (isPlayer2) {
+    if (userGameRole === "player2") {
       return (
         <div className="text-sm">
           <span className="font-medium">Status:</span>
@@ -561,28 +610,49 @@ function StatusIndicator({
 function ActionButtons({
   gameData,
   userAddress,
+  userGameRole,
   onCreateGame,
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
+  canJoinGame,
   onViewResults,
   isViewingResults,
   setModalMode,
   setShowMoveSelector,
   isSubmittingMove,
+  isCreatingGame,
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
   onCreateGame: () => void;
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
+  canJoinGame: boolean;
   onViewResults: () => void;
   isViewingResults: boolean;
   setModalMode: (mode: "join" | "submit") => void;
   setShowMoveSelector: (show: boolean) => void;
   isSubmittingMove: boolean;
+  isCreatingGame: boolean;
 }) {
+  if (!gameData) {
+    // No game state - show start new game
+    return (
+      <div className="pt-2">
+        <button
+          onClick={onCreateGame}
+          disabled={!canCreateGame || isCreatingGame}
+          className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
+        >
+          {isCreatingGame ? "Creating Game..." : "Start New Game"}
+        </button>
+      </div>
+    );
+  }
+
   if (isSubmittingMove) {
     return (
       <div className="pt-2 space-y-2">
@@ -593,14 +663,7 @@ function ActionButtons({
     );
   }
 
-  const isPlayer1 = gameData?.player1 === userAddress;
-  const isPlayer2 = gameData?.player2 === userAddress;
-  const canJoin =
-    gameData?.status === BigInt(1) &&
-    gameData?.player2 === "0x0000000000000000000000000000000000000000" &&
-    !isPlayer1;
-
-  if (canJoin) {
+  if (canJoinGame && userGameRole === "no_role") {
     // Can join existing game
     return (
       <div className="pt-2">
@@ -609,15 +672,16 @@ function ActionButtons({
             setModalMode("join");
             setShowMoveSelector(true);
           }}
-          className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700"
+          disabled={isSubmittingMove}
+          className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:bg-gray-400"
         >
-          Join This Game
+          {isSubmittingMove ? "Joining Game..." : "Join This Game"}
         </button>
       </div>
     );
   }
 
-  if (isPlayer2) {
+  if (userGameRole === "player2") {
     // Player 2 - always show view results and new game buttons
     return (
       <div className="pt-2 space-y-2">
@@ -631,10 +695,10 @@ function ActionButtons({
           </button>
           <button
             onClick={onCreateGame}
-            disabled={!canCreateGame}
+            disabled={!canCreateGame || isCreatingGame}
             className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
           >
-            New Game
+            {isCreatingGame ? "Creating Game..." : "New Game"}
           </button>
         </div>
       </div>
@@ -642,54 +706,56 @@ function ActionButtons({
   }
 
   // Player 1 logic based on status
-  if (gameData?.status === BigInt(0)) {
-    // Waiting for moves - show submit move
-    return (
-      <div className="pt-2 space-y-2">
-        <button
-          onClick={onSubmitMove}
-          disabled={!canSubmitMove}
-          className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          Submit Your Move
-        </button>
-      </div>
-    );
-  }
-
-  if (gameData?.status === BigInt(1)) {
-    // Waiting for Player 2 - show waiting status
-    return (
-      <div className="pt-2 space-y-2">
-        <div className="text-center text-gray-500 text-sm">
-          Waiting for Player 2 to join...
-        </div>
-      </div>
-    );
-  }
-
-  if (gameData?.status === BigInt(2)) {
-    // Game resolved - show view results and new game
-    return (
-      <div className="pt-2 space-y-2">
-        <div className="flex gap-2">
+  if (userGameRole === "player1") {
+    if (gameData.status === BigInt(0)) {
+      // Waiting for moves - show submit move
+      return (
+        <div className="pt-2 space-y-2">
           <button
-            onClick={onViewResults}
-            disabled={isViewingResults}
-            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+            onClick={onSubmitMove}
+            disabled={!canSubmitMove || isSubmittingMove}
+            className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {isViewingResults ? "Decrypting..." : "View Results"}
-          </button>
-          <button
-            onClick={onCreateGame}
-            disabled={!canCreateGame}
-            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
-          >
-            New Game
+            {isSubmittingMove ? "Submitting Move..." : "Submit Your Move"}
           </button>
         </div>
-      </div>
-    );
+      );
+    }
+
+    if (gameData.status === BigInt(1)) {
+      // Waiting for Player 2 - show waiting status
+      return (
+        <div className="pt-2 space-y-2">
+          <div className="text-center text-gray-500 text-sm">
+            Waiting for Player 2 to join...
+          </div>
+        </div>
+      );
+    }
+
+    if (gameData.status === BigInt(2)) {
+      // Game resolved - show view results and new game
+      return (
+        <div className="pt-2 space-y-2">
+          <div className="flex gap-2">
+            <button
+              onClick={onViewResults}
+              disabled={isViewingResults}
+              className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+            >
+              {isViewingResults ? "Decrypting..." : "View Results"}
+            </button>
+            <button
+              onClick={onCreateGame}
+              disabled={!canCreateGame || isCreatingGame}
+              className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
+            >
+              {isCreatingGame ? "Creating Game..." : "New Game"}
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Fallback
@@ -720,60 +786,75 @@ function GameStatusBox({
   gameData,
   gameId,
   userAddress,
+  userGameRole,
   onCreateGame,
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
+  canJoinGame,
   gameResult,
   isViewingResults,
   onViewResults,
   setModalMode,
   setShowMoveSelector,
   isSubmittingMove,
+  isCreatingGame,
 }: {
   gameData: any;
   gameId: bigint | null;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
   onCreateGame: () => void;
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
+  canJoinGame: boolean;
   gameResult: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
   setModalMode: (mode: "join" | "submit") => void;
   setShowMoveSelector: (show: boolean) => void;
   isSubmittingMove: boolean;
+  isCreatingGame: boolean;
 }) {
   return (
     <>
-      <div className="border rounded-lg p-4 bg-white shadow-sm">
-        <h4 className="font-semibold mb-4 text-center">🎮 GAME STATUS</h4>
-        <div className="space-y-3">
-          <RoleIndicator gameData={gameData} userAddress={userAddress} />
-          <OpponentInfo gameData={gameData} userAddress={userAddress} />
-          <StatusIndicator gameData={gameData} userAddress={userAddress} />
-          <ActionButtons
-            gameData={gameData}
-            userAddress={userAddress}
-            onCreateGame={onCreateGame}
-            onSubmitMove={onSubmitMove}
-            canCreateGame={canCreateGame}
-            canSubmitMove={canSubmitMove}
-            onViewResults={onViewResults}
-            isViewingResults={isViewingResults}
-            setModalMode={setModalMode}
-            setShowMoveSelector={setShowMoveSelector}
-            isSubmittingMove={isSubmittingMove}
-          />
-          <GameResult gameResult={gameResult} />
-        </div>
-        {gameData && (
-          <div className="mt-4 pt-3 border-t text-xs text-gray-500 text-center">
-            Game ID: #{gameId ? gameId.toString() : "N/A"}
-          </div>
-        )}
+      <h4 className="font-semibold mb-4 text-center">🎮 GAME STATUS</h4>
+      <div className="space-y-3">
+        <RoleIndicator userGameRole={userGameRole} />
+        <OpponentInfo
+          gameData={gameData}
+          userAddress={userAddress}
+          userGameRole={userGameRole}
+        />
+        <StatusIndicator
+          gameData={gameData}
+          userAddress={userAddress}
+          userGameRole={userGameRole}
+        />
+        <ActionButtons
+          gameData={gameData}
+          userAddress={userAddress}
+          userGameRole={userGameRole}
+          onCreateGame={onCreateGame}
+          onSubmitMove={onSubmitMove}
+          canCreateGame={canCreateGame}
+          canSubmitMove={canSubmitMove}
+          canJoinGame={canJoinGame}
+          onViewResults={onViewResults}
+          isViewingResults={isViewingResults}
+          setModalMode={setModalMode}
+          setShowMoveSelector={setShowMoveSelector}
+          isSubmittingMove={isSubmittingMove}
+          isCreatingGame={isCreatingGame}
+        />
+        <GameResult gameResult={gameResult} />
       </div>
+      {gameData && (
+        <div className="mt-4 pt-3 border-t text-xs text-gray-500 text-center">
+          Game ID: #{gameId ? gameId.toString() : "N/A"}
+        </div>
+      )}
     </>
   );
 }
@@ -782,30 +863,36 @@ function GameStatusBoxSection({
   gameData,
   gameId,
   userAddress,
+  userGameRole,
   onCreateGame,
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
+  canJoinGame,
   gameResult,
   isViewingResults,
   onViewResults,
   setModalMode,
   setShowMoveSelector,
   isSubmittingMove,
+  isCreatingGame,
 }: {
   gameData: any;
   gameId: bigint | null;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
   onCreateGame: () => void;
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
+  canJoinGame: boolean;
   gameResult: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
   setModalMode: (mode: "join" | "submit") => void;
   setShowMoveSelector: (show: boolean) => void;
   isSubmittingMove: boolean;
+  isCreatingGame: boolean;
 }) {
   return (
     <div className="col-span-full mx-20 px-4 pb-4 rounded-lg bg-white border-2 border-black">
@@ -813,16 +900,19 @@ function GameStatusBoxSection({
         gameData={gameData}
         gameId={gameId}
         userAddress={userAddress}
+        userGameRole={userGameRole}
         onCreateGame={onCreateGame}
         onSubmitMove={onSubmitMove}
         canCreateGame={canCreateGame}
         canSubmitMove={canSubmitMove}
+        canJoinGame={canJoinGame}
         gameResult={gameResult}
         isViewingResults={isViewingResults}
         onViewResults={onViewResults}
         setModalMode={setModalMode}
         setShowMoveSelector={setShowMoveSelector}
         isSubmittingMove={isSubmittingMove}
+        isCreatingGame={isCreatingGame}
       />
     </div>
   );
@@ -843,6 +933,7 @@ function MoveSelectorModal({
   selectedMove,
   setShowMoveSelector,
   handleSubmitMove,
+  isSubmittingMove,
 }: {
   modalMode: "join" | "submit";
   setSelectedMove: (move: number) => void;
@@ -850,6 +941,7 @@ function MoveSelectorModal({
   selectedMove: number | null;
   setShowMoveSelector: (show: boolean) => void;
   handleSubmitMove: () => void;
+  isSubmittingMove: boolean;
 }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -907,10 +999,14 @@ function MoveSelectorModal({
           </button>
           <button
             onClick={handleSubmitMove}
-            disabled={selectedMove === null}
+            disabled={selectedMove === null || isSubmittingMove}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Submit Move
+            {isSubmittingMove
+              ? modalMode === "join"
+                ? "Joining Game..."
+                : "Submitting..."
+              : "Submit Move"}
           </button>
         </div>
       </div>
@@ -1050,7 +1146,7 @@ export const DummyRockPaperScissorsDemo = () => {
         the buttons below to simulate different game states and switch between
         player views.
       </p>
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-4">
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => window.location.reload()}
@@ -1070,12 +1166,119 @@ export const DummyRockPaperScissorsDemo = () => {
             {currentPlayerView === "player1" ? "Player 2" : "Player 1"} View
           </button>
         </div>
-        <p className="text-xs text-yellow-600 mt-2">
-          Current View:{" "}
-          <strong>
-            {currentPlayerView === "player1" ? "Player 1" : "Player 2"}
-          </strong>
-        </p>
+
+        <div>
+          <p className="text-sm font-semibold text-yellow-800 mb-2">
+            Set Game State:
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => rockPaperScissors.setDemoGameState("no_game")}
+              className="bg-gray-600 text-white px-3 py-1 rounded text-xs hover:bg-gray-700"
+            >
+              No Game
+            </button>
+            <button
+              onClick={() =>
+                rockPaperScissors.setDemoGameState("waiting_player2")
+              }
+              className="bg-orange-600 text-white px-3 py-1 rounded text-xs hover:bg-orange-700"
+            >
+              Waiting for P2
+            </button>
+            <button
+              onClick={() =>
+                rockPaperScissors.setDemoGameState("waiting_moves")
+              }
+              className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
+            >
+              Waiting for Moves
+            </button>
+            <button
+              onClick={() => rockPaperScissors.setDemoGameState("resolved")}
+              className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"
+            >
+              Game Resolved
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-yellow-800 mb-2">
+            Set User Role:
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => rockPaperScissors.setDemoUserRole("none")}
+              className="bg-gray-500 text-white px-3 py-1 rounded text-xs hover:bg-gray-600"
+            >
+              No Role
+            </button>
+            <button
+              onClick={() => rockPaperScissors.setDemoUserRole("player1")}
+              className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700"
+            >
+              Player 1
+            </button>
+            <button
+              onClick={() => rockPaperScissors.setDemoUserRole("player2")}
+              className="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700"
+            >
+              Player 2
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-yellow-800 mb-2">
+            Set Game Result:
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setGameResult("Draw!")}
+              className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700"
+            >
+              Draw
+            </button>
+            <button
+              onClick={() => setGameResult("Player 1 Wins!")}
+              className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"
+            >
+              Player 1 Wins
+            </button>
+            <button
+              onClick={() => setGameResult("Player 2 Wins!")}
+              className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
+            >
+              Player 2 Wins
+            </button>
+            <button
+              onClick={() => setGameResult(null)}
+              className="bg-gray-500 text-white px-3 py-1 rounded text-xs hover:bg-gray-600"
+            >
+              Clear Result
+            </button>
+          </div>
+        </div>
+
+        <div className="text-xs text-yellow-600 space-y-1">
+          <p>
+            Current View:{" "}
+            <strong>
+              {currentPlayerView === "player1" ? "Player 1" : "Player 2"}
+            </strong>
+          </p>
+          <p>
+            Current Game State:{" "}
+            <strong>{rockPaperScissors.gameDisplayState}</strong>
+          </p>
+          <p>
+            Current User Role: <strong>{rockPaperScissors.userGameRole}</strong>
+          </p>
+          <p>
+            Current Game Result: <strong>{gameResult || "None"}</strong>
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -1115,6 +1318,27 @@ export const DummyRockPaperScissorsDemo = () => {
 
       <DemoControls />
 
+      <GameStatusBoxSection
+        gameData={rockPaperScissors.latestGame?.data}
+        gameId={rockPaperScissors.latestGame?.gameId ?? null}
+        userAddress={accounts?.[0] as `0x${string}` | undefined}
+        userGameRole={rockPaperScissors.userGameRole}
+        onCreateGame={rockPaperScissors.createGame}
+        onSubmitMove={() => setShowMoveSelector(true)}
+        canCreateGame={rockPaperScissors.canCreateGame ?? false}
+        canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
+        canJoinGame={rockPaperScissors.canJoinGame ?? false}
+        gameResult={gameResult}
+        isViewingResults={isViewingResults}
+        onViewResults={handleViewResults}
+        setModalMode={setModalMode}
+        setShowMoveSelector={setShowMoveSelector}
+        isSubmittingMove={rockPaperScissors.isSubmittingMove}
+        isCreatingGame={rockPaperScissors.isCreatingGame}
+      />
+
+      <MessageSection message={rockPaperScissors.message} />
+
       <ChainInfoSection
         chainId={chainId}
         accounts={accounts}
@@ -1130,32 +1354,9 @@ export const DummyRockPaperScissorsDemo = () => {
             fhevmStatus={fhevmStatus}
             fhevmError={fhevmError ?? null}
           />
-          <GameStatusSection
-            gameDisplayState={rockPaperScissors.gameDisplayState}
-            latestGameId={rockPaperScissors.latestGame?.gameId?.toString()}
-            isCreatingGame={rockPaperScissors.isCreatingGame}
-            isSubmittingMove={rockPaperScissors.isSubmittingMove}
-          />
+          <HowToPlaySection />
         </div>
       </div>
-
-      <GameStatusBoxSection
-        gameData={rockPaperScissors.latestGame?.data}
-        gameId={rockPaperScissors.latestGame?.gameId ?? null}
-        userAddress={accounts?.[0] as `0x${string}` | undefined}
-        onCreateGame={rockPaperScissors.createGame}
-        onSubmitMove={() => setShowMoveSelector(true)}
-        canCreateGame={rockPaperScissors.canCreateGame ?? false}
-        canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
-        gameResult={gameResult}
-        isViewingResults={isViewingResults}
-        onViewResults={handleViewResults}
-        setModalMode={setModalMode}
-        setShowMoveSelector={setShowMoveSelector}
-        isSubmittingMove={rockPaperScissors.isSubmittingMove}
-      />
-
-      <MessageSection message={rockPaperScissors.message} />
 
       {/* Move Selector Modal */}
       {showMoveSelector && (
@@ -1166,6 +1367,7 @@ export const DummyRockPaperScissorsDemo = () => {
           selectedMove={selectedMove}
           setShowMoveSelector={setShowMoveSelector}
           handleSubmitMove={handleSubmitMove}
+          isSubmittingMove={rockPaperScissors.isSubmittingMove}
         />
       )}
     </div>

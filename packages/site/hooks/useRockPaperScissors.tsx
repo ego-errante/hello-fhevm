@@ -21,96 +21,21 @@ import {
 import { RockPaperScissorsAddresses } from "@/abi/RockPaperScissorsAddresses";
 import { RockPaperScissorsABI } from "@/abi/RockPaperScissorsABI";
 
-export type GameData = {
-  player1: `0x${string}`;
-  player2: `0x${string}`;
-  move1: string;
-  move2: string;
-  result: string;
-  status: number;
-  createdAt: bigint;
-  resolvedAt: bigint;
-};
-
-export type LatestGame = {
-  gameId: bigint;
-  data: GameData | null;
-  isLoading: boolean;
-};
-
-type RockPaperScissorsInfoType = {
-  abi: typeof RockPaperScissorsABI.abi;
-  address?: `0x${string}`;
-  chainId?: number;
-  chainName?: string;
-};
-
-/**
- * Resolves RockPaperScissors contract metadata for the given EVM `chainId`.
- */
-function getRockPaperScissorsByChainId(
-  chainId: number | undefined
-): RockPaperScissorsInfoType {
-  if (!chainId) {
-    return { abi: RockPaperScissorsABI.abi };
-  }
-
-  const entry =
-    RockPaperScissorsAddresses[
-      chainId.toString() as keyof typeof RockPaperScissorsAddresses
-    ];
-
-  if (!("address" in entry) || entry.address === ethers.ZeroAddress) {
-    return { abi: RockPaperScissorsABI.abi, chainId };
-  }
-
-  return {
-    address: entry?.address as `0x${string}` | undefined,
-    chainId: entry?.chainId ?? chainId,
-    chainName: entry?.chainName,
-    abi: RockPaperScissorsABI.abi,
-  };
-}
-
-export const useRockPaperScissors = (parameters: {
-  instance: FhevmInstance | undefined;
-  fhevmDecryptionSignatureStorage: GenericStringStorage;
-  eip1193Provider: ethers.Eip1193Provider | undefined;
+// Sub-hooks for better organization
+function useGameState(parameters: {
   chainId: number | undefined;
-  ethersSigner: ethers.JsonRpcSigner | undefined;
   ethersReadonlyProvider: ethers.ContractRunner | undefined;
-  sameChain: RefObject<(chainId: number | undefined) => boolean>;
-  sameSigner: RefObject<
-    (ethersSigner: ethers.JsonRpcSigner | undefined) => boolean
-  >;
   userAddress: `0x${string}` | undefined;
-}) => {
-  const {
-    instance,
-    fhevmDecryptionSignatureStorage,
-    chainId,
-    ethersSigner,
-    ethersReadonlyProvider,
-    sameChain,
-    sameSigner,
-    userAddress,
-  } = parameters;
-
-  const queryClient = useQueryClient();
+}) {
+  const { chainId, ethersReadonlyProvider, userAddress } = parameters;
 
   //////////////////////////////////////////////////////////////////////////////
-  // States + Refs
+  // RockPaperScissors Contract
   //////////////////////////////////////////////////////////////////////////////
 
   const rockPaperScissorsRef = useRef<RockPaperScissorsInfoType | undefined>(
     undefined
   );
-
-  const [message, setMessage] = useState<string>("");
-
-  //////////////////////////////////////////////////////////////////////////////
-  // RockPaperScissors Contract
-  //////////////////////////////////////////////////////////////////////////////
 
   const rockPaperScissors = useMemo(() => {
     const c = getRockPaperScissorsByChainId(chainId);
@@ -202,19 +127,11 @@ export const useRockPaperScissors = (parameters: {
   //////////////////////////////////////////////////////////////////////////////
 
   const userGameRole = useMemo(() => {
-    console.log("============");
-    console.log("got here 1");
-    console.log("userAddress", userAddress);
-    console.log("latestGame data", latestGame?.data);
     if (!userAddress || !latestGame?.data) {
       return "no_role";
     }
 
-    console.log("got here 2");
     const { data: gameData } = latestGame;
-
-    console.log("gameData.player1", gameData.player1);
-    console.log("gameData.player2", gameData.player2);
 
     const isPlayer1 =
       gameData.player1?.toLowerCase() === userAddress?.toLowerCase();
@@ -229,9 +146,36 @@ export const useRockPaperScissors = (parameters: {
       return "player2";
     }
 
-    console.log("got here 3");
     return "no_role";
   }, [userAddress, latestGame]);
+
+  return {
+    rockPaperScissors,
+    isDeployed,
+    latestGame,
+    userGameRole,
+    isLoadingGames,
+  };
+}
+
+function useGameActions(parameters: {
+  instance: FhevmInstance | undefined;
+  ethersSigner: ethers.JsonRpcSigner | undefined;
+  rockPaperScissors: RockPaperScissorsInfoType;
+  latestGame: LatestGame | null | undefined;
+  userGameRole: string;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const {
+    instance,
+    ethersSigner,
+    rockPaperScissors,
+    latestGame,
+    userGameRole,
+    queryClient,
+  } = parameters;
+
+  const [message, setMessage] = useState<string>("");
 
   //////////////////////////////////////////////////////////////////////////////
   // Contract Interaction State
@@ -393,6 +337,41 @@ export const useRockPaperScissors = (parameters: {
     },
   });
 
+  // Create a combined loading state for all operations
+  const isProcessing =
+    createGameMutation.isPending || submitMoveMutation.isPending;
+
+  return {
+    message,
+    canCreateGame,
+    createGameMutation,
+    canJoinGame,
+    canSubmitMove,
+    submitMoveMutation,
+    isProcessing,
+  };
+}
+
+function useGameResults(parameters: {
+  instance: FhevmInstance | undefined;
+  ethersSigner: ethers.JsonRpcSigner | undefined;
+  fhevmDecryptionSignatureStorage: GenericStringStorage;
+  rockPaperScissors: RockPaperScissorsInfoType;
+  latestGame: LatestGame | null | undefined;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const {
+    instance,
+    ethersSigner,
+    fhevmDecryptionSignatureStorage,
+    rockPaperScissors,
+    latestGame,
+    queryClient,
+  } = parameters;
+
+  const [gameResult, setGameResult] = useState<string | null>(null);
+  const [isViewingResults, setIsViewingResults] = useState(false);
+
   // Generate decryption signature when needed (called from component)
   const generateDecryptionSignature = useCallback(async () => {
     if (
@@ -436,36 +415,278 @@ export const useRockPaperScissors = (parameters: {
     fhevmDecryptionSignatureStorage,
   ]);
 
-  // Create a combined loading state for all operations
-  const isProcessing =
-    createGameMutation.isPending || submitMoveMutation.isPending;
+  const viewResultsMutation = useMutation({
+    mutationFn: async () => {
+      if (
+        !latestGame?.gameId ||
+        !instance ||
+        !rockPaperScissors.address ||
+        !ethersSigner ||
+        !fhevmDecryptionSignatureStorage
+      ) {
+        throw new Error("Prerequisites not met for viewing results");
+      }
+
+      setIsViewingResults(true);
+      setGameResult(null);
+
+      try {
+        const gameId = latestGame.gameId;
+
+        // Use ethers.js to call the contract's getGame function
+        const contract = new ethers.Contract(
+          rockPaperScissors.address,
+          rockPaperScissors.abi,
+          ethersSigner
+        );
+
+        const gameData = await contract.getGame(gameId);
+        const encryptedResult = gameData.result;
+
+        // Generate/ensure decryption signature exists (only when viewing results)
+        await generateDecryptionSignature();
+
+        // Load decryption signature from storage
+        const decryptionSignature =
+          await FhevmDecryptionSignature.loadFromGenericStringStorage(
+            fhevmDecryptionSignatureStorage,
+            instance,
+            [rockPaperScissors.address],
+            ethersSigner.address
+          );
+
+        if (!decryptionSignature) {
+          throw new Error(
+            "No decryption signature found. Please generate one first."
+          );
+        }
+
+        // Decrypt the result using FHEVM with the loaded signature
+        const decryptedResult = await instance.userDecrypt(
+          [
+            {
+              handle: encryptedResult,
+              contractAddress: rockPaperScissors.address,
+            },
+          ],
+          decryptionSignature.privateKey,
+          decryptionSignature.publicKey,
+          decryptionSignature.signature,
+          decryptionSignature.contractAddresses,
+          decryptionSignature.userAddress,
+          decryptionSignature.startTimestamp,
+          decryptionSignature.durationDays
+        );
+
+        // Convert to human-readable format
+        const resultMap: { [key: number]: string } = {
+          0: "Draw!",
+          1: "Player 1 Wins!",
+          2: "Player 2 Wins!",
+        };
+
+        const resultKey = Number(decryptedResult[encryptedResult]);
+        const result = resultMap[resultKey] || "Unknown result";
+
+        setGameResult(result);
+        return result;
+      } catch (error) {
+        const errorMessage =
+          "Failed to load results: " + (error as Error).message;
+        setGameResult(errorMessage);
+        throw error;
+      } finally {
+        setIsViewingResults(false);
+      }
+    },
+    onSuccess: () => {
+      // Invalidate and refetch the latest game query to get updated state
+      queryClient.invalidateQueries({
+        queryKey: ["rock-paper-scissors", "latest-game"],
+      });
+    },
+  });
+
+  const canViewResults = useMemo(() => {
+    if (
+      !latestGame?.data ||
+      !rockPaperScissors.address ||
+      !instance ||
+      !ethersSigner
+    ) {
+      return false;
+    }
+
+    const gameStatus = Number(latestGame.data.status);
+    const userGameRole = (() => {
+      if (!ethersSigner?.address) return "no_role";
+
+      const isPlayer1 =
+        latestGame.data.player1?.toLowerCase() ===
+        ethersSigner.address?.toLowerCase();
+      const isPlayer2 =
+        latestGame.data.player2 &&
+        latestGame.data.player2?.toLowerCase() ===
+          ethersSigner.address?.toLowerCase();
+
+      if (isPlayer1) return "player1";
+      if (isPlayer2) return "player2";
+      return "no_role";
+    })();
+
+    // Can view results when game is resolved (status = 2) or when you're a player and game is in progress
+    return gameStatus === 2 || (userGameRole !== "no_role" && gameStatus >= 1);
+  }, [latestGame?.data, rockPaperScissors.address, instance, ethersSigner]);
+
+  return {
+    gameResult,
+    isViewingResults,
+    viewResultsMutation,
+    canViewResults,
+    generateDecryptionSignature,
+  };
+}
+
+export type GameData = {
+  player1: `0x${string}`;
+  player2: `0x${string}`;
+  move1: string;
+  move2: string;
+  result: string;
+  status: number;
+  createdAt: bigint;
+  resolvedAt: bigint;
+};
+
+export type LatestGame = {
+  gameId: bigint;
+  data: GameData | null;
+  isLoading: boolean;
+};
+
+type RockPaperScissorsInfoType = {
+  abi: typeof RockPaperScissorsABI.abi;
+  address?: `0x${string}`;
+  chainId?: number;
+  chainName?: string;
+};
+
+/**
+ * Resolves RockPaperScissors contract metadata for the given EVM `chainId`.
+ */
+function getRockPaperScissorsByChainId(
+  chainId: number | undefined
+): RockPaperScissorsInfoType {
+  if (!chainId) {
+    return { abi: RockPaperScissorsABI.abi };
+  }
+
+  const entry =
+    RockPaperScissorsAddresses[
+      chainId.toString() as keyof typeof RockPaperScissorsAddresses
+    ];
+
+  if (!("address" in entry) || entry.address === ethers.ZeroAddress) {
+    return { abi: RockPaperScissorsABI.abi, chainId };
+  }
+
+  return {
+    address: entry?.address as `0x${string}` | undefined,
+    chainId: entry?.chainId ?? chainId,
+    chainName: entry?.chainName,
+    abi: RockPaperScissorsABI.abi,
+  };
+}
+
+export const useRockPaperScissors = (parameters: {
+  instance: FhevmInstance | undefined;
+  fhevmDecryptionSignatureStorage: GenericStringStorage;
+  eip1193Provider: ethers.Eip1193Provider | undefined;
+  chainId: number | undefined;
+  ethersSigner: ethers.JsonRpcSigner | undefined;
+  ethersReadonlyProvider: ethers.ContractRunner | undefined;
+  sameChain: RefObject<(chainId: number | undefined) => boolean>;
+  sameSigner: RefObject<
+    (ethersSigner: ethers.JsonRpcSigner | undefined) => boolean
+  >;
+  userAddress: `0x${string}` | undefined;
+}) => {
+  const {
+    instance,
+    fhevmDecryptionSignatureStorage,
+    chainId,
+    ethersSigner,
+    ethersReadonlyProvider,
+    userAddress,
+  } = parameters;
+
+  const queryClient = useQueryClient();
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Sub-hooks for organized logic
+  //////////////////////////////////////////////////////////////////////////////
+
+  const gameState = useGameState({
+    chainId,
+    ethersReadonlyProvider,
+    userAddress,
+  });
+
+  const gameActions = useGameActions({
+    instance,
+    ethersSigner,
+    rockPaperScissors: gameState.rockPaperScissors,
+    latestGame: gameState.latestGame,
+    userGameRole: gameState.userGameRole,
+    queryClient,
+  });
+
+  const gameResults = useGameResults({
+    instance,
+    ethersSigner,
+    fhevmDecryptionSignatureStorage,
+    rockPaperScissors: gameState.rockPaperScissors,
+    latestGame: gameState.latestGame,
+    queryClient,
+  });
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Combined return interface
+  //////////////////////////////////////////////////////////////////////////////
 
   return {
     // Contract info
-    contractAddress: rockPaperScissors.address,
-    isDeployed,
+    contractAddress: gameState.rockPaperScissors.address,
+    isDeployed: gameState.isDeployed,
 
     // Game state
-    latestGame,
-    userGameRole,
+    latestGame: gameState.latestGame,
+    userGameRole: gameState.userGameRole,
 
-    // Actions
-    canCreateGame,
-    createGame: createGameMutation.mutate,
-    canSubmitMove,
-    canJoinGame,
-    submitEncryptedMove: submitMoveMutation.mutate,
-    generateDecryptionSignature,
+    // Game actions
+    canCreateGame: gameActions.canCreateGame,
+    createGame: gameActions.createGameMutation.mutate,
+    canSubmitMove: gameActions.canSubmitMove,
+    canJoinGame: gameActions.canJoinGame,
+    submitEncryptedMove: gameActions.submitMoveMutation.mutate,
+
+    // Game results
+    gameResult: gameResults.gameResult,
+    isViewingResults: gameResults.isViewingResults,
+    canViewResults: gameResults.canViewResults,
+    viewResults: gameResults.viewResultsMutation.mutate,
+    generateDecryptionSignature: gameResults.generateDecryptionSignature,
 
     // Status - unified loading states
-    message,
-    isCreatingGame: createGameMutation.isPending,
-    isSubmittingMove: submitMoveMutation.isPending,
-    isLoadingGames,
-    isProcessing,
+    message: gameActions.message,
+    isCreatingGame: gameActions.createGameMutation.isPending,
+    isSubmittingMove: gameActions.submitMoveMutation.isPending,
+    isLoadingGames: gameState.isLoadingGames,
+    isProcessing: gameActions.isProcessing,
 
     // Error states
-    createGameError: createGameMutation.error,
-    submitMoveError: submitMoveMutation.error,
+    createGameError: gameActions.createGameMutation.error,
+    submitMoveError: gameActions.submitMoveMutation.error,
+    viewResultsError: gameResults.viewResultsMutation.error,
   };
 };
