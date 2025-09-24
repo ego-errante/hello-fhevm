@@ -1,7 +1,7 @@
 "use client";
 
 import { ethers } from "ethers";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FaHandRock,
   FaHandPaper,
@@ -9,6 +9,7 @@ import {
   FaRegHandScissors,
   FaRegHandPaper,
   FaRegHandRock,
+  FaRegHourglass,
 } from "react-icons/fa";
 
 // Mock Types
@@ -178,6 +179,10 @@ const useRockPaperScissors = (params: any) => {
   const [userRole, setUserRole] = useState<"player1" | "player2" | "none">(
     "none"
   );
+  const [gameResult, setGameResult] = useState<string | null>(null);
+  const [myMove, setMyMove] = useState<string | null>(null);
+  const [isViewingResults, setIsViewingResults] = useState(false);
+  const [selectedMove, setSelectedMove] = useState<number | null>(null);
 
   const userAddress = params.userAddress;
   const mockContractAddress = "0x1234567890123456789012345678901234567890";
@@ -281,6 +286,63 @@ const useRockPaperScissors = (params: any) => {
     (gameState === "waiting_player2" && userRole === "none");
   const canJoinGame = gameState === "waiting_player2" && userRole === "none";
 
+  const handleViewResults = async () => {
+    if (!latestGame?.gameId || !params.instance) {
+      return;
+    }
+
+    setIsViewingResults(true);
+    setGameResult(null);
+
+    try {
+      // Mock contract call - in real app this would call getResult
+      const encryptedResult = latestGame.data?.result || "mock_draw";
+
+      await generateDecryptionSignature();
+
+      const decryptionSignature = await FhevmDecryptionSignature.generate(
+        params.instance,
+        [mockContractAddress],
+        userAddress || "0x0",
+        30
+      );
+
+      const decryptedResult = await params.instance.userDecrypt(
+        [
+          {
+            handle: encryptedResult,
+            contractAddress: mockContractAddress,
+          },
+        ],
+        decryptionSignature.privateKey,
+        decryptionSignature.publicKey,
+        decryptionSignature.signature,
+        decryptionSignature.contractAddresses,
+        decryptionSignature.userAddress,
+        decryptionSignature.startTimestamp,
+        decryptionSignature.durationDays
+      );
+
+      const resultMap: { [key: number]: string } = {
+        0: "Draw!",
+        1: "Player 1 Wins!",
+        2: "Player 2 Wins!",
+      };
+
+      const resultKey = Number(decryptedResult[encryptedResult]);
+      setGameResult(resultMap[resultKey] || "Unknown result");
+
+      // Mock user's move based on their role
+      const moveMap = ["Rock", "Paper", "Scissors"];
+      setMyMove(moveMap[selectedMove || 0] || "Unknown");
+    } catch (error) {
+      console.error("Failed to view results:", error);
+      setGameResult("Failed to load results: " + (error as Error).message);
+    } finally {
+      setIsViewingResults(false);
+    }
+  };
+
   // Demo control functions
   const setDemoGameState = (
     newState: "no_game" | "waiting_player2" | "waiting_moves" | "resolved"
@@ -310,6 +372,11 @@ const useRockPaperScissors = (params: any) => {
     setMessage(`Demo: Set user role to ${role}`);
   };
 
+  const setDemoGameResult = (result: string | null) => {
+    setGameResult(result);
+    setMessage(`Demo: Set game result to ${result || "None"}`);
+  };
+
   return {
     contractAddress: mockContractAddress,
     isDeployed: true,
@@ -326,9 +393,14 @@ const useRockPaperScissors = (params: any) => {
     isLoadingGames: false,
     userGameRole,
     canJoinGame,
+    gameResult,
+    myMove,
+    isViewingResults,
+    viewResults: handleViewResults,
     // Demo controls
     setDemoGameState,
     setDemoUserRole,
+    setDemoGameResult,
   };
 };
 
@@ -479,7 +551,7 @@ function HowToPlaySection() {
 function RoleIndicator({ userGameRole }: { userGameRole: string }) {
   if (userGameRole === "player1") {
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Your Role:</span> Player 1
       </div>
     );
@@ -487,7 +559,7 @@ function RoleIndicator({ userGameRole }: { userGameRole: string }) {
 
   if (userGameRole === "player2") {
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Your Role:</span> Player 2
       </div>
     );
@@ -497,7 +569,7 @@ function RoleIndicator({ userGameRole }: { userGameRole: string }) {
   // This is handled by the hook's canSubmitMove logic, but we show "Available to join" for no_role users
   if (userGameRole === "no_role") {
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Available to join</span>
       </div>
     );
@@ -522,9 +594,9 @@ function OpponentInfo({
       gameData.player2 &&
       gameData.player2 !== "0x0000000000000000000000000000000000000000";
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Opponent:</span>
-        <p className="text-xs font-mono break-all mt-1">
+        <p className="font-mono break-all mt-1">
           {hasOpponent ? gameData.player2 : "Waiting for opponent"}
         </p>
       </div>
@@ -533,18 +605,18 @@ function OpponentInfo({
 
   if (userGameRole === "player2") {
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Opponent:</span>
-        <p className="text-xs font-mono break-all mt-1">{gameData.player1}</p>
+        <p className="font-mono break-all mt-1">{gameData.player1}</p>
       </div>
     );
   }
 
   // Can join view - show creator
   return (
-    <div className="text-sm">
+    <div>
       <span className="font-medium">Created by:</span>
-      <p className="text-xs font-mono break-all mt-1">{gameData.player1}</p>
+      <p className="font-mono break-all mt-1">{gameData.player1}</p>
     </div>
   );
 }
@@ -559,16 +631,14 @@ function StatusIndicator({
   userGameRole: string;
 }) {
   if (!gameData) {
-    return (
-      <div className="text-sm text-gray-600">No active games available</div>
-    );
+    return <div className="text-gray-600">No active games available</div>;
   }
 
   if (gameData.status === BigInt(0)) {
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">
+        <p className="mt-1">
           {userGameRole === "player1"
             ? "Submit your move"
             : "Waiting for Player 1's move"}
@@ -580,31 +650,31 @@ function StatusIndicator({
   if (gameData.status === BigInt(1)) {
     if (userGameRole === "player2") {
       return (
-        <div className="text-sm">
+        <div>
           <span className="font-medium">Status:</span>
-          <p className="text-xs mt-1">Move submitted - waiting for results</p>
+          <p className="mt-1">Move submitted - waiting for results</p>
         </div>
       );
     }
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">Waiting for Player 2</p>
+        <p className="mt-1">Waiting for Player 2</p>
       </div>
     );
   }
 
   if (gameData.status === BigInt(2)) {
     return (
-      <div className="text-sm">
+      <div>
         <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">Game resolved</p>
+        <p className="mt-1">Game resolved</p>
       </div>
     );
   }
 
   // Fallback for no game state
-  return <div className="text-sm">Create a new game to start playing</div>;
+  return <div>Create a new game to start playing</div>;
 }
 
 function ActionButtons({
@@ -645,9 +715,9 @@ function ActionButtons({
         <button
           onClick={onCreateGame}
           disabled={!canCreateGame || isCreatingGame}
-          className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
+          className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
         >
-          {isCreatingGame ? "Creating Game..." : "Start New Game"}
+          {isCreatingGame ? "Creating Game..." : "New Game"}
         </button>
       </div>
     );
@@ -673,7 +743,7 @@ function ActionButtons({
             setShowMoveSelector(true);
           }}
           disabled={isSubmittingMove}
-          className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:bg-gray-400"
+          className="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 disabled:bg-gray-400"
         >
           {isSubmittingMove ? "Joining Game..." : "Join This Game"}
         </button>
@@ -689,14 +759,14 @@ function ActionButtons({
           <button
             onClick={onViewResults}
             disabled={isViewingResults}
-            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
           >
             {isViewingResults ? "Decrypting..." : "View Results"}
           </button>
           <button
             onClick={onCreateGame}
             disabled={!canCreateGame || isCreatingGame}
-            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
+            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
           >
             {isCreatingGame ? "Creating Game..." : "New Game"}
           </button>
@@ -714,7 +784,7 @@ function ActionButtons({
           <button
             onClick={onSubmitMove}
             disabled={!canSubmitMove || isSubmittingMove}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+            className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
           >
             {isSubmittingMove ? "Submitting Move..." : "Submit Your Move"}
           </button>
@@ -741,14 +811,14 @@ function ActionButtons({
             <button
               onClick={onViewResults}
               disabled={isViewingResults}
-              className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+              className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
             >
               {isViewingResults ? "Decrypting..." : "View Results"}
             </button>
             <button
               onClick={onCreateGame}
               disabled={!canCreateGame || isCreatingGame}
-              className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
+              className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
             >
               {isCreatingGame ? "Creating Game..." : "New Game"}
             </button>
@@ -760,24 +830,34 @@ function ActionButtons({
 
   // Fallback
   return (
-    <div className="pt-2">
-      <button
-        onClick={onCreateGame}
-        disabled={!canCreateGame}
-        className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
-      >
-        Start New Game
-      </button>
-    </div>
+    <button
+      onClick={onCreateGame}
+      disabled={!canCreateGame || isCreatingGame}
+      className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
+    >
+      {isCreatingGame ? "Creating Game..." : "New Game"}
+    </button>
   );
 }
 
-function GameResult({ gameResult }: { gameResult: string | null }) {
+function GameResultDetails({
+  gameResult,
+  myMove,
+}: {
+  gameResult: string | null;
+  myMove: string | null;
+}) {
   if (!gameResult) return null;
 
   return (
     <div className="w-full bg-green-100 border border-green-300 rounded p-3 text-center">
       <p className="text-green-800 font-semibold text-lg">{gameResult}</p>
+      {myMove && (
+        <div className="mt-2 text-sm text-green-700">
+          <p>Your move: {myMove}</p>
+          <p>Opponent's move: Hidden</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -793,6 +873,7 @@ function GameStatusBox({
   canSubmitMove,
   canJoinGame,
   gameResult,
+  myMove,
   isViewingResults,
   onViewResults,
   setModalMode,
@@ -810,6 +891,7 @@ function GameStatusBox({
   canSubmitMove: boolean;
   canJoinGame: boolean;
   gameResult: string | null;
+  myMove: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
   setModalMode: (mode: "join" | "submit") => void;
@@ -819,7 +901,10 @@ function GameStatusBox({
 }) {
   return (
     <>
-      <h4 className="font-semibold mb-4 text-center">🎮 GAME STATUS</h4>
+      <h4 className="font-semibold mb-4 text-center flex items-center justify-center gap-2">
+        <FaRegHourglass />
+        <span>GAME STATUS</span>
+      </h4>
       <div className="space-y-3">
         <RoleIndicator userGameRole={userGameRole} />
         <OpponentInfo
@@ -848,10 +933,10 @@ function GameStatusBox({
           isSubmittingMove={isSubmittingMove}
           isCreatingGame={isCreatingGame}
         />
-        <GameResult gameResult={gameResult} />
+        <GameResultDetails gameResult={gameResult} myMove={myMove} />
       </div>
       {gameData && (
-        <div className="mt-4 pt-3 border-t text-xs text-gray-500 text-center">
+        <div className="mt-4 pt-3 border-t text-sm text-gray-500 font-semibold text-center">
           Game ID: #{gameId ? gameId.toString() : "N/A"}
         </div>
       )}
@@ -870,6 +955,7 @@ function GameStatusBoxSection({
   canSubmitMove,
   canJoinGame,
   gameResult,
+  myMove,
   isViewingResults,
   onViewResults,
   setModalMode,
@@ -887,6 +973,7 @@ function GameStatusBoxSection({
   canSubmitMove: boolean;
   canJoinGame: boolean;
   gameResult: string | null;
+  myMove: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
   setModalMode: (mode: "join" | "submit") => void;
@@ -907,6 +994,7 @@ function GameStatusBoxSection({
         canSubmitMove={canSubmitMove}
         canJoinGame={canJoinGame}
         gameResult={gameResult}
+        myMove={myMove}
         isViewingResults={isViewingResults}
         onViewResults={onViewResults}
         setModalMode={setModalMode}
@@ -961,7 +1049,7 @@ function MoveSelectorModal({
             }`}
           >
             <FaHandRock className="text-3xl mb-2" />
-            <span className="text-sm font-medium">Rock</span>
+            <span className="font-medium">Rock</span>
           </button>
           <button
             onClick={() => setSelectedMove(1)}
@@ -972,7 +1060,7 @@ function MoveSelectorModal({
             }`}
           >
             <FaHandPaper className="text-3xl mb-2" />
-            <span className="text-sm font-medium">Paper</span>
+            <span className="font-medium">Paper</span>
           </button>
           <button
             onClick={() => setSelectedMove(2)}
@@ -983,7 +1071,7 @@ function MoveSelectorModal({
             }`}
           >
             <FaRegHandScissors className="text-3xl mb-2 rotate-90" />
-            <span className="text-sm font-medium">Scissors</span>
+            <span className="font-medium">Scissors</span>
           </button>
         </div>
         <div className="flex gap-3">
@@ -1056,11 +1144,15 @@ export const DummyRockPaperScissorsDemo = () => {
     userAddress: accounts?.[0] as `0x${string}` | undefined,
   });
 
+  const buttonClass =
+    "inline-flex items-center justify-center rounded-xl bg-black px-4 py-4 font-semibold text-white shadow-sm " +
+    "transition-colors duration-200 hover:bg-blue-700 active:bg-blue-800 " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 " +
+    "disabled:opacity-50 disabled:pointer-events-none";
+
   const [selectedMove, setSelectedMove] = useState<number | null>(null);
   const [showMoveSelector, setShowMoveSelector] = useState(false);
   const [modalMode, setModalMode] = useState<"join" | "submit">("submit");
-  const [gameResult, setGameResult] = useState<string | null>(null);
-  const [isViewingResults, setIsViewingResults] = useState(false);
 
   const handleSubmitMove = async () => {
     if (selectedMove !== null) {
@@ -1074,65 +1166,6 @@ export const DummyRockPaperScissorsDemo = () => {
   const handleJoinGame = async () => {
     setModalMode("join");
     setShowMoveSelector(true);
-  };
-
-  const handleViewResults = async () => {
-    if (
-      !rockPaperScissors.latestGame?.gameId ||
-      !fhevmInstance ||
-      !rockPaperScissors.contractAddress ||
-      !ethersSigner
-    ) {
-      return;
-    }
-
-    setIsViewingResults(true);
-    setGameResult(null);
-
-    try {
-      // Mock contract call - in real app this would call getResult
-      const encryptedResult =
-        rockPaperScissors.latestGame.data?.result || "mock_draw";
-
-      await rockPaperScissors.generateDecryptionSignature();
-
-      const decryptionSignature = await FhevmDecryptionSignature.generate(
-        fhevmInstance,
-        [rockPaperScissors.contractAddress],
-        ethersSigner.address,
-        30
-      );
-
-      const decryptedResult = await fhevmInstance.userDecrypt(
-        [
-          {
-            handle: encryptedResult,
-            contractAddress: rockPaperScissors.contractAddress,
-          },
-        ],
-        decryptionSignature.privateKey,
-        decryptionSignature.publicKey,
-        decryptionSignature.signature,
-        decryptionSignature.contractAddresses,
-        decryptionSignature.userAddress,
-        decryptionSignature.startTimestamp,
-        decryptionSignature.durationDays
-      );
-
-      const resultMap: { [key: number]: string } = {
-        0: "Draw!",
-        1: "Player 1 Wins!",
-        2: "Player 2 Wins!",
-      };
-
-      const resultKey = Number(decryptedResult[encryptedResult]);
-      setGameResult(resultMap[resultKey] || "Unknown result");
-    } catch (error) {
-      console.error("Failed to view results:", error);
-      setGameResult("Failed to load results: " + (error as Error).message);
-    } finally {
-      setIsViewingResults(false);
-    }
   };
 
   // Demo Controls Component
@@ -1235,25 +1268,29 @@ export const DummyRockPaperScissorsDemo = () => {
           </p>
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setGameResult("Draw!")}
+              onClick={() => rockPaperScissors.setDemoGameResult("Draw!")}
               className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700"
             >
               Draw
             </button>
             <button
-              onClick={() => setGameResult("Player 1 Wins!")}
+              onClick={() =>
+                rockPaperScissors.setDemoGameResult("Player 1 Wins!")
+              }
               className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"
             >
               Player 1 Wins
             </button>
             <button
-              onClick={() => setGameResult("Player 2 Wins!")}
+              onClick={() =>
+                rockPaperScissors.setDemoGameResult("Player 2 Wins!")
+              }
               className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
             >
               Player 2 Wins
             </button>
             <button
-              onClick={() => setGameResult(null)}
+              onClick={() => rockPaperScissors.setDemoGameResult(null)}
               className="bg-gray-500 text-white px-3 py-1 rounded text-xs hover:bg-gray-600"
             >
               Clear Result
@@ -1276,7 +1313,12 @@ export const DummyRockPaperScissorsDemo = () => {
             Current User Role: <strong>{rockPaperScissors.userGameRole}</strong>
           </p>
           <p>
-            Current Game Result: <strong>{gameResult || "None"}</strong>
+            Current Game Result:{" "}
+            <strong>{rockPaperScissors.gameResult || "None"}</strong>
+          </p>
+          <p>
+            Current My Move:{" "}
+            <strong>{rockPaperScissors.myMove || "None"}</strong>
           </p>
         </div>
       </div>
@@ -1287,7 +1329,7 @@ export const DummyRockPaperScissorsDemo = () => {
     return (
       <div className="mx-auto">
         <button
-          className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-4 font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 active:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
+          className={buttonClass}
           disabled={isConnected}
           onClick={connect}
         >
@@ -1328,9 +1370,10 @@ export const DummyRockPaperScissorsDemo = () => {
         canCreateGame={rockPaperScissors.canCreateGame ?? false}
         canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
         canJoinGame={rockPaperScissors.canJoinGame ?? false}
-        gameResult={gameResult}
-        isViewingResults={isViewingResults}
-        onViewResults={handleViewResults}
+        gameResult={rockPaperScissors.gameResult}
+        myMove={rockPaperScissors.myMove}
+        isViewingResults={rockPaperScissors.isViewingResults}
+        onViewResults={rockPaperScissors.viewResults}
         setModalMode={setModalMode}
         setShowMoveSelector={setShowMoveSelector}
         isSubmittingMove={rockPaperScissors.isSubmittingMove}

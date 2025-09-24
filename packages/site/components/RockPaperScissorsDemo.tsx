@@ -16,6 +16,8 @@ import {
   FaRegHandPaper,
   FaRegHandRock,
   FaRegHourglass,
+  FaQuestion,
+  FaLock,
 } from "react-icons/fa";
 
 /*
@@ -136,7 +138,7 @@ export const RockPaperScissorsDemo = () => {
       <div className="col-span-full mx-20 bg-black text-white">
         <p className="font-bold  text-2xl m-5">
           <span className="font-mono font-normal text-gray-400">
-            Encrypted RockPaperScissors powered by Zama FHEVM
+            Encrypted Rock-Paper-Scissors powered by Zama FHEVM
           </span>
         </p>
       </div>
@@ -152,6 +154,7 @@ export const RockPaperScissorsDemo = () => {
         canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
         canJoinGame={rockPaperScissors.canJoinGame ?? false}
         gameResult={rockPaperScissors.gameResult}
+        myMove={rockPaperScissors.myMove}
         isViewingResults={rockPaperScissors.isViewingResults}
         onViewResults={rockPaperScissors.viewResults}
         setModalMode={setModalMode}
@@ -426,6 +429,60 @@ function StatusIndicator({
   return <div>Create a new game to start playing</div>;
 }
 
+// Add these helper components before ActionButtons
+function GameButton({
+  onClick,
+  disabled = false,
+  variant = "primary",
+  fullWidth = false,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: "primary" | "secondary" | "success" | "join" | "waiting";
+  fullWidth?: boolean;
+  children: React.ReactNode;
+}) {
+  const baseClasses =
+    "px-4 py-2 rounded font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed";
+  const widthClass = fullWidth ? "w-full" : "flex-1";
+
+  const variantClasses = {
+    primary:
+      "bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400",
+    secondary: "bg-slate-600 text-white hover:bg-slate-700",
+    success: "bg-green-600 text-white hover:bg-green-700",
+    join: "bg-blue-600 text-white hover:bg-blue-700",
+    waiting: "text-center text-gray-500 text-sm",
+  };
+
+  if (variant === "waiting") {
+    return (
+      <div className={`${baseClasses} ${variantClasses[variant]}`}>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseClasses} ${widthClass} ${variantClasses[variant]}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ButtonContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pt-2 space-y-2">
+      <div className="flex gap-2">{children}</div>
+    </div>
+  );
+}
+
 function ActionButtons({
   gameData,
   userAddress,
@@ -457,146 +514,253 @@ function ActionButtons({
   isSubmittingMove: boolean;
   isCreatingGame: boolean;
 }) {
+  // Helper to create join game action
+  const handleJoinGame = () => {
+    setModalMode("join");
+    setShowMoveSelector(true);
+  };
+
+  // No game state
   if (!gameData) {
-    // No game state - show start new game
     return (
-      <div className="pt-2">
-        <button
+      <ButtonContainer>
+        <GameButton
           onClick={onCreateGame}
           disabled={!canCreateGame || isCreatingGame}
-          className="w-full bg-primary text-primary-foreground px-4 py-2 rounded hover:bg-primary/90 disabled:bg-gray-400"
+          variant="primary"
+          fullWidth
         >
           {isCreatingGame ? "Creating Game..." : "Start New Game"}
-        </button>
-      </div>
+        </GameButton>
+      </ButtonContainer>
     );
   }
 
-  if (isSubmittingMove) {
-    return (
-      <div className="pt-2 space-y-2">
-        <div className="text-center text-gray-500 text-sm">
-          Submitting move...
-        </div>
-      </div>
-    );
-  }
-
+  // Can join existing game
   if (canJoinGame && userGameRole === "no_role") {
-    // Can join existing game
     return (
-      <div className="pt-2">
-        <button
-          onClick={() => {
-            setModalMode("join");
-            setShowMoveSelector(true);
-          }}
+      <ButtonContainer>
+        <GameButton
+          onClick={handleJoinGame}
           disabled={isSubmittingMove}
-          className="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 disabled:bg-gray-400"
+          variant="join"
+          fullWidth
         >
           {isSubmittingMove ? "Joining Game..." : "Join This Game"}
-        </button>
-      </div>
+        </GameButton>
+      </ButtonContainer>
     );
   }
 
+  // Player 2 - always show both buttons
   if (userGameRole === "player2") {
-    // Player 2 - always show view results and new game buttons
     return (
-      <div className="pt-2 space-y-2">
-        <div className="flex gap-2">
-          <button
-            onClick={onViewResults}
-            disabled={isViewingResults}
-            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
-          >
-            {isViewingResults ? "Decrypting..." : "View Results"}
-          </button>
-          <button
-            onClick={onCreateGame}
-            disabled={!canCreateGame || isCreatingGame}
-            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
-          >
-            {isCreatingGame ? "Creating Game..." : "New Game"}
-          </button>
-        </div>
-      </div>
+      <ButtonContainer>
+        <GameButton
+          onClick={onViewResults}
+          disabled={isViewingResults}
+          variant="secondary"
+        >
+          {isViewingResults ? "Decrypting..." : "View Results"}
+        </GameButton>
+        <GameButton
+          onClick={onCreateGame}
+          disabled={!canCreateGame || isCreatingGame}
+          variant="primary"
+        >
+          {isCreatingGame ? "Creating Game..." : "New Game"}
+        </GameButton>
+      </ButtonContainer>
     );
   }
 
-  // Player 1 logic based on status
+  // Player 1 logic based on game status
   if (userGameRole === "player1") {
-    if (gameData.status === BigInt(0)) {
-      // Waiting for moves - show submit move
+    const status = gameData.status;
+
+    if (status === BigInt(0)) {
       return (
-        <div className="pt-2 space-y-2">
-          <button
+        <ButtonContainer>
+          <GameButton
             onClick={onSubmitMove}
             disabled={!canSubmitMove || isSubmittingMove}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+            variant="success"
+            fullWidth
           >
             {isSubmittingMove ? "Submitting Move..." : "Submit Your Move"}
-          </button>
-        </div>
+          </GameButton>
+        </ButtonContainer>
       );
     }
 
-    if (gameData.status === BigInt(1)) {
-      // Waiting for Player 2 - show waiting status
+    if (status === BigInt(1)) {
       return (
-        <div className="pt-2 space-y-2">
-          <div className="text-center text-gray-500 text-sm">
+        <ButtonContainer>
+          <GameButton variant="waiting" onClick={() => {}}>
             Waiting for Player 2 to join...
-          </div>
-        </div>
+          </GameButton>
+        </ButtonContainer>
       );
     }
 
-    if (gameData.status === BigInt(2)) {
-      // Game resolved - show view results and new game
+    if (status === BigInt(2)) {
       return (
-        <div className="pt-2 space-y-2">
-          <div className="flex gap-2">
-            <button
-              onClick={onViewResults}
-              disabled={isViewingResults}
-              className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
-            >
-              {isViewingResults ? "Decrypting..." : "View Results"}
-            </button>
-            <button
-              onClick={onCreateGame}
-              disabled={!canCreateGame || isCreatingGame}
-              className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
-            >
-              {isCreatingGame ? "Creating Game..." : "New Game"}
-            </button>
-          </div>
-        </div>
+        <ButtonContainer>
+          <GameButton
+            onClick={onViewResults}
+            disabled={isViewingResults}
+            variant="secondary"
+          >
+            {isViewingResults ? "Decrypting..." : "View Results"}
+          </GameButton>
+          <GameButton
+            onClick={onCreateGame}
+            disabled={!canCreateGame || isCreatingGame}
+            variant="primary"
+          >
+            {isCreatingGame ? "Creating Game..." : "New Game"}
+          </GameButton>
+        </ButtonContainer>
       );
     }
   }
 
   // Fallback
   return (
-    <div className="pt-2">
-      <button
+    <ButtonContainer>
+      <GameButton
         onClick={onCreateGame}
         disabled={!canCreateGame}
-        className="w-full bg-primary text-primary-foreground px-4 py-2 rounded hover:bg-primary/90 disabled:bg-gray-400"
+        variant="primary"
+        fullWidth
       >
         Start New Game
-      </button>
-    </div>
+      </GameButton>
+    </ButtonContainer>
   );
 }
 
-function GameResult({ gameResult }: { gameResult: string | null }) {
+function GameResultDetails({
+  gameResult,
+  myMove,
+  userGameRole,
+}: {
+  gameResult: string | null;
+  myMove: string | null;
+  userGameRole: string;
+}) {
   if (!gameResult) return null;
 
+  // Determine the outcome from user's perspective
+  const getOutcomeType = (result: string, userRole: string) => {
+    if (result.includes("Failed") || result.includes("Unknown")) {
+      return "error";
+    }
+    if (result.includes("Draw")) {
+      return "draw";
+    }
+    if (result.includes("Player 1 Wins")) {
+      return userRole === "player1" ? "win" : "lose";
+    }
+    if (result.includes("Player 2 Wins")) {
+      return userRole === "player2" ? "win" : "lose";
+    }
+    return "unknown";
+  };
+
+  const outcomeType = getOutcomeType(gameResult, userGameRole);
+
+  // Get appropriate styling based on outcome - matching existing color scheme
+  const getOutcomeStyles = (type: string) => {
+    switch (type) {
+      case "win":
+        return {
+          container:
+            "bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-400",
+          accent: "text-yellow-800",
+          badge: "bg-yellow-400 text-black",
+          message: "You Won!",
+        };
+      case "lose":
+        return {
+          container:
+            "bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-400",
+          accent: "text-slate-700",
+          badge: "bg-slate-600 text-white",
+          message: "You Lost",
+        };
+      case "draw":
+        return {
+          container:
+            "bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400",
+          accent: "text-blue-700",
+          badge: "bg-blue-600 text-white",
+          message: "Draw!",
+        };
+      case "error":
+        return {
+          container:
+            "bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-400",
+          accent: "text-gray-600",
+          badge: "bg-gray-500 text-white",
+          message: "Error",
+        };
+      default:
+        return {
+          container: "bg-white border-2 border-black",
+          accent: "text-gray-700",
+          badge: "bg-black text-white",
+          message: "Game Result",
+        };
+    }
+  };
+
+  const styles = getOutcomeStyles(outcomeType);
+
+  // Get move emoji
+  const getMoveEmoji = (move: string) => {
+    switch (move?.toLowerCase()) {
+      case "rock":
+        return <FaHandRock />;
+      case "paper":
+        return <FaHandPaper />;
+      case "scissors":
+        return <FaHandScissors className="rotate-90" />;
+      default:
+        return <FaQuestion />;
+    }
+  };
+
   return (
-    <div className="w-full bg-green-100 border border-green-300 rounded p-3 text-center">
-      <p className="text-green-800 font-semibold text-lg">{gameResult}</p>
+    <div className={`w-full rounded-lg p-4 text-center ${styles.container}`}>
+      <div className="flex items-center justify-center gap-3">
+        <div className="flex flex-col items-center">
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-bold ${styles.badge}`}
+          >
+            {outcomeType === "error" ? "ERROR" : styles.message}
+          </span>
+        </div>
+      </div>
+
+      {outcomeType === "error" && (
+        <p className={`text-sm ${styles.accent} mb-3`}>{gameResult}</p>
+      )}
+
+      {myMove && outcomeType !== "error" && (
+        <div className="p-3 rounded-md">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className={`font-semibold text-black`}>
+              Your move: {myMove}
+            </span>
+            <span className="text-lg">{getMoveEmoji(myMove)}</span>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-sm">
+            <FaLock />
+            <span className={styles.accent}>Opponent's move: Hidden</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -612,6 +776,7 @@ function GameStatusBox({
   canSubmitMove,
   canJoinGame,
   gameResult,
+  myMove,
   isViewingResults,
   onViewResults,
   setModalMode,
@@ -629,6 +794,7 @@ function GameStatusBox({
   canSubmitMove: boolean;
   canJoinGame: boolean;
   gameResult: string | null;
+  myMove: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
   setModalMode: (mode: "join" | "submit") => void;
@@ -670,7 +836,26 @@ function GameStatusBox({
           isSubmittingMove={isSubmittingMove}
           isCreatingGame={isCreatingGame}
         />
-        <GameResult gameResult={gameResult} />
+        <GameResultDetails
+          userGameRole={userGameRole}
+          // gameResult={"Draw"}
+          // gameResult={"Player 1 Wins!"}
+          // myMove={myMove}
+          // gameResult={gameResult} myMove={myMove} />
+          gameResult={"Player 2 Wins!"}
+          myMove={"Rock"}
+        />
+        <GameResultDetails
+          userGameRole={userGameRole}
+          gameResult={"Player 1 Wins!"}
+          myMove={"Paper"}
+        />
+
+        <GameResultDetails
+          userGameRole={userGameRole}
+          gameResult={"Draw!"}
+          myMove={"Scissors"}
+        />
       </div>
       {gameData && (
         <div className="mt-4 pt-3 border-t text-sm text-gray-500 font-semibold text-center">
@@ -692,6 +877,7 @@ function GameStatusBoxSection({
   canSubmitMove,
   canJoinGame,
   gameResult,
+  myMove,
   isViewingResults,
   onViewResults,
   setModalMode,
@@ -709,6 +895,7 @@ function GameStatusBoxSection({
   canSubmitMove: boolean;
   canJoinGame: boolean;
   gameResult: string | null;
+  myMove: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
   setModalMode: (mode: "join" | "submit") => void;
@@ -729,6 +916,7 @@ function GameStatusBoxSection({
         canSubmitMove={canSubmitMove}
         canJoinGame={canJoinGame}
         gameResult={gameResult}
+        myMove={myMove}
         isViewingResults={isViewingResults}
         onViewResults={onViewResults}
         setModalMode={setModalMode}
@@ -815,14 +1003,14 @@ function MoveSelectorModal({
               setSelectedMove(0);
               setModalMode("submit");
             }}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-semibold"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmitMove}
             disabled={selectedMove === null || isSubmittingMove}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
           >
             {isSubmittingMove
               ? modalMode === "join"

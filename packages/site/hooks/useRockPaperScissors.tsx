@@ -358,6 +358,7 @@ function useGameResults(parameters: {
   fhevmDecryptionSignatureStorage: GenericStringStorage;
   rockPaperScissors: RockPaperScissorsInfoType;
   latestGame: LatestGame | null | undefined;
+  userGameRole: string;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const {
@@ -366,10 +367,12 @@ function useGameResults(parameters: {
     fhevmDecryptionSignatureStorage,
     rockPaperScissors,
     latestGame,
+    userGameRole,
     queryClient,
   } = parameters;
 
   const [gameResult, setGameResult] = useState<string | null>(null);
+  const [myMove, setMyMove] = useState<string | null>(null);
   const [isViewingResults, setIsViewingResults] = useState(false);
 
   // Generate decryption signature when needed (called from component)
@@ -429,6 +432,7 @@ function useGameResults(parameters: {
 
       setIsViewingResults(true);
       setGameResult(null);
+      setMyMove(null);
 
       try {
         const gameId = latestGame.gameId;
@@ -442,6 +446,8 @@ function useGameResults(parameters: {
 
         const gameData = await contract.getGame(gameId);
         const encryptedResult = gameData.result;
+        const encryptedMove1 = gameData.move1;
+        const encryptedMove2 = gameData.move2;
 
         // Generate/ensure decryption signature exists (only when viewing results)
         await generateDecryptionSignature();
@@ -462,13 +468,27 @@ function useGameResults(parameters: {
         }
 
         // Decrypt the result using FHEVM with the loaded signature
-        const decryptedResult = await instance.userDecrypt(
-          [
-            {
-              handle: encryptedResult,
-              contractAddress: rockPaperScissors.address,
-            },
-          ],
+        const handlesToDecrypt = [
+          {
+            handle: encryptedResult,
+            contractAddress: rockPaperScissors.address,
+          },
+        ];
+
+        if (userGameRole === "player1") {
+          handlesToDecrypt.push({
+            handle: encryptedMove1,
+            contractAddress: rockPaperScissors.address,
+          });
+        } else if (userGameRole === "player2") {
+          handlesToDecrypt.push({
+            handle: encryptedMove2,
+            contractAddress: rockPaperScissors.address,
+          });
+        }
+
+        const decryptedValues = await instance.userDecrypt(
+          handlesToDecrypt,
           decryptionSignature.privateKey,
           decryptionSignature.publicKey,
           decryptionSignature.signature,
@@ -485,11 +505,25 @@ function useGameResults(parameters: {
           2: "Player 2 Wins!",
         };
 
-        const resultKey = Number(decryptedResult[encryptedResult]);
+        const resultKey = Number(decryptedValues[encryptedResult]);
         const result = resultMap[resultKey] || "Unknown result";
-
         setGameResult(result);
-        return result;
+
+        const moveMap: { [key: number]: string } = {
+          0: "Rock",
+          1: "Paper",
+          2: "Scissors",
+        };
+
+        if (userGameRole === "player1") {
+          const moveKey = Number(decryptedValues[encryptedMove1]);
+          setMyMove(moveMap[moveKey] || "Unknown move");
+        } else if (userGameRole === "player2") {
+          const moveKey = Number(decryptedValues[encryptedMove2]);
+          setMyMove(moveMap[moveKey] || "Unknown move");
+        }
+
+        return { result, myMove };
       } catch (error) {
         const errorMessage =
           "Failed to load results: " + (error as Error).message;
@@ -540,6 +574,7 @@ function useGameResults(parameters: {
 
   return {
     gameResult,
+    myMove,
     isViewingResults,
     viewResultsMutation,
     canViewResults,
@@ -647,6 +682,7 @@ export const useRockPaperScissors = (parameters: {
     fhevmDecryptionSignatureStorage,
     rockPaperScissors: gameState.rockPaperScissors,
     latestGame: gameState.latestGame,
+    userGameRole: gameState.userGameRole,
     queryClient,
   });
 
@@ -672,6 +708,7 @@ export const useRockPaperScissors = (parameters: {
 
     // Game results
     gameResult: gameResults.gameResult,
+    myMove: gameResults.myMove,
     isViewingResults: gameResults.isViewingResults,
     canViewResults: gameResults.canViewResults,
     viewResults: gameResults.viewResultsMutation.mutate,
