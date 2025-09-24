@@ -115,11 +115,8 @@ export const RockPaperScissorsDemo = () => {
 
   const handleSubmitMove = async () => {
     if (selectedMove !== null) {
-      if (modalMode === "join") {
-        await rockPaperScissors.joinGame();
-      } else {
-        await rockPaperScissors.submitEncryptedMove(selectedMove);
-      }
+      // Start the async operation but close modal immediately (optimistic UI)
+      rockPaperScissors.submitEncryptedMove(selectedMove);
       setShowMoveSelector(false);
       setSelectedMove(null);
       setModalMode("submit");
@@ -240,7 +237,6 @@ export const RockPaperScissorsDemo = () => {
             latestGameId={rockPaperScissors.latestGame?.gameId?.toString()}
             isCreatingGame={rockPaperScissors.isCreatingGame}
             isSubmittingMove={rockPaperScissors.isSubmittingMove}
-            isResolvingGame={rockPaperScissors.isResolvingGame}
           />
         </div>
       </div>
@@ -250,16 +246,15 @@ export const RockPaperScissorsDemo = () => {
         gameId={rockPaperScissors.latestGame?.gameId ?? null}
         userAddress={accounts?.[0] as `0x${string}` | undefined}
         onCreateGame={rockPaperScissors.createGame}
-        onJoinGame={handleJoinGame}
         onSubmitMove={() => setShowMoveSelector(true)}
-        onResolveGame={rockPaperScissors.resolveGame}
         canCreateGame={rockPaperScissors.canCreateGame ?? false}
-        canJoinGame={rockPaperScissors.canJoinGame ?? false}
         canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
-        canResolveGame={rockPaperScissors.canResolveGame ?? false}
         gameResult={gameResult}
         isViewingResults={isViewingResults}
         onViewResults={handleViewResults}
+        setModalMode={setModalMode}
+        setShowMoveSelector={setShowMoveSelector}
+        isSubmittingMove={rockPaperScissors.isSubmittingMove}
       />
 
       <MessageSection message={rockPaperScissors.message} />
@@ -342,13 +337,11 @@ function GameStatusSection({
   latestGameId,
   isCreatingGame,
   isSubmittingMove,
-  isResolvingGame,
 }: {
   gameDisplayState: string;
   latestGameId: string | undefined;
   isCreatingGame: boolean;
   isSubmittingMove: boolean;
-  isResolvingGame: boolean;
 }) {
   return (
     <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
@@ -357,7 +350,6 @@ function GameStatusSection({
       {printProperty("Latest Game ID", latestGameId)}
       {printProperty("Is Creating Game", isCreatingGame)}
       {printProperty("Is Submitting Move", isSubmittingMove)}
-      {printProperty("Is Resolving Game", isResolvingGame)}
     </div>
   );
 }
@@ -373,7 +365,7 @@ function RoleIndicator({
   const isPlayer2 = gameData?.player2 === userAddress;
   const canJoin =
     gameData &&
-    gameData.status === BigInt(0) &&
+    gameData.status === BigInt(1) &&
     gameData.player2 === "0x0000000000000000000000000000000000000000";
 
   if (isPlayer1) {
@@ -460,43 +452,33 @@ function StatusIndicator({
     );
   }
 
+  const isPlayer1 = gameData.player1 === userAddress;
   const isPlayer2 = gameData.player2 === userAddress;
-  const canJoin =
-    gameData.status === BigInt(0) &&
-    gameData.player2 === "0x0000000000000000000000000000000000000000";
-
-  if (canJoin) {
-    return (
-      <div className="text-sm">
-        <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">Waiting for second player</p>
-      </div>
-    );
-  }
-
-  if (isPlayer2) {
-    return (
-      <div className="text-sm">
-        <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">Move submitted - waiting for results</p>
-      </div>
-    );
-  }
 
   if (gameData.status === BigInt(0)) {
     return (
       <div className="text-sm">
         <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">Waiting for moves</p>
+        <p className="text-xs mt-1">
+          {isPlayer1 ? "Submit your move" : "Waiting for Player 1's move"}
+        </p>
       </div>
     );
   }
 
   if (gameData.status === BigInt(1)) {
+    if (isPlayer2) {
+      return (
+        <div className="text-sm">
+          <span className="font-medium">Status:</span>
+          <p className="text-xs mt-1">Move submitted - waiting for results</p>
+        </div>
+      );
+    }
     return (
       <div className="text-sm">
         <span className="font-medium">Status:</span>
-        <p className="text-xs mt-1">Moves submitted - can resolve</p>
+        <p className="text-xs mt-1">Waiting for Player 2</p>
       </div>
     );
   }
@@ -518,57 +500,69 @@ function ActionButtons({
   gameData,
   userAddress,
   onCreateGame,
-  onJoinGame,
   onSubmitMove,
-  onResolveGame,
   canCreateGame,
-  canJoinGame,
   canSubmitMove,
-  canResolveGame,
   onViewResults,
   isViewingResults,
+  setModalMode,
+  setShowMoveSelector,
+  isSubmittingMove,
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
   onCreateGame: () => void;
-  onJoinGame: () => void;
   onSubmitMove: () => void;
-  onResolveGame: () => void;
   canCreateGame: boolean;
-  canJoinGame: boolean;
   canSubmitMove: boolean;
-  canResolveGame: boolean;
   onViewResults: () => void;
   isViewingResults: boolean;
+  setModalMode: (mode: "join" | "submit") => void;
+  setShowMoveSelector: (show: boolean) => void;
+  isSubmittingMove: boolean;
 }) {
-  if (!gameData) {
-    // No game state - show start new game
+  // if (!gameData) {
+  //   // No game state - show start new game
+  //   return (
+  //     <div className="pt-2">
+  //       <button
+  //         onClick={onCreateGame}
+  //         disabled={!canCreateGame}
+  //         className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
+  //       >
+  //         Start New Game
+  //       </button>
+  //     </div>
+  //   );
+  // }
+
+  if (isSubmittingMove) {
     return (
-      <div className="pt-2">
-        <button
-          onClick={onCreateGame}
-          disabled={!canCreateGame}
-          className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
-        >
-          Start New Game
-        </button>
+      <div className="pt-2 space-y-2">
+        <div className="text-center text-gray-500 text-sm">
+          Submitting move...
+        </div>
       </div>
     );
   }
 
+  const isPlayer1 = gameData.player1 === userAddress;
   const isPlayer2 = gameData.player2 === userAddress;
   const canJoin =
-    gameData.status === BigInt(0) &&
-    gameData.player2 === "0x0000000000000000000000000000000000000000";
+    gameData.status === BigInt(1) &&
+    gameData.player2 === "0x0000000000000000000000000000000000000000" &&
+    !isPlayer1;
 
   if (canJoin) {
     // Can join existing game
     return (
       <div className="pt-2">
         <button
-          onClick={onJoinGame}
-          disabled={!canJoinGame}
-          className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:bg-gray-400"
+          onClick={() => {
+            setModalMode("join");
+            setShowMoveSelector(true);
+          }}
+          className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700"
         >
           Join This Game
         </button>
@@ -617,16 +611,12 @@ function ActionButtons({
   }
 
   if (gameData.status === BigInt(1)) {
-    // Moves submitted - show resolve
+    // Waiting for Player 2 - show waiting status
     return (
       <div className="pt-2 space-y-2">
-        <button
-          onClick={onResolveGame}
-          disabled={!canResolveGame}
-          className="w-full bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:bg-gray-400"
-        >
-          Resolve Game
-        </button>
+        <div className="text-center text-gray-500 text-sm">
+          Waiting for Player 2 to join...
+        </div>
       </div>
     );
   }
@@ -684,31 +674,29 @@ function GameStatusBox({
   gameId,
   userAddress,
   onCreateGame,
-  onJoinGame,
   onSubmitMove,
-  onResolveGame,
   canCreateGame,
-  canJoinGame,
   canSubmitMove,
-  canResolveGame,
   gameResult,
   isViewingResults,
   onViewResults,
+  setModalMode,
+  setShowMoveSelector,
+  isSubmittingMove,
 }: {
   gameData: any;
   gameId: bigint | null;
   userAddress: `0x${string}` | undefined;
   onCreateGame: () => void;
-  onJoinGame: () => void;
   onSubmitMove: () => void;
-  onResolveGame: () => void;
   canCreateGame: boolean;
-  canJoinGame: boolean;
   canSubmitMove: boolean;
-  canResolveGame: boolean;
   gameResult: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
+  setModalMode: (mode: "join" | "submit") => void;
+  setShowMoveSelector: (show: boolean) => void;
+  isSubmittingMove: boolean;
 }) {
   return (
     <>
@@ -722,15 +710,14 @@ function GameStatusBox({
             gameData={gameData}
             userAddress={userAddress}
             onCreateGame={onCreateGame}
-            onJoinGame={onJoinGame}
             onSubmitMove={onSubmitMove}
-            onResolveGame={onResolveGame}
             canCreateGame={canCreateGame}
-            canJoinGame={canJoinGame}
             canSubmitMove={canSubmitMove}
-            canResolveGame={canResolveGame}
             onViewResults={onViewResults}
             isViewingResults={isViewingResults}
+            setModalMode={setModalMode}
+            setShowMoveSelector={setShowMoveSelector}
+            isSubmittingMove={isSubmittingMove}
           />
           <GameResult gameResult={gameResult} />
         </div>
@@ -749,31 +736,29 @@ function GameStatusBoxSection({
   gameId,
   userAddress,
   onCreateGame,
-  onJoinGame,
   onSubmitMove,
-  onResolveGame,
   canCreateGame,
-  canJoinGame,
   canSubmitMove,
-  canResolveGame,
   gameResult,
   isViewingResults,
   onViewResults,
+  setModalMode,
+  setShowMoveSelector,
+  isSubmittingMove,
 }: {
   gameData: any;
   gameId: bigint | null;
   userAddress: `0x${string}` | undefined;
   onCreateGame: () => void;
-  onJoinGame: () => void;
   onSubmitMove: () => void;
-  onResolveGame: () => void;
   canCreateGame: boolean;
-  canJoinGame: boolean;
   canSubmitMove: boolean;
-  canResolveGame: boolean;
   gameResult: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
+  setModalMode: (mode: "join" | "submit") => void;
+  setShowMoveSelector: (show: boolean) => void;
+  isSubmittingMove: boolean;
 }) {
   return (
     <div className="col-span-full mx-20 px-4 pb-4 rounded-lg bg-white border-2 border-black">
@@ -782,16 +767,15 @@ function GameStatusBoxSection({
         gameId={gameId}
         userAddress={userAddress}
         onCreateGame={onCreateGame}
-        onJoinGame={onJoinGame}
         onSubmitMove={onSubmitMove}
-        onResolveGame={onResolveGame}
         canCreateGame={canCreateGame}
-        canJoinGame={canJoinGame}
         canSubmitMove={canSubmitMove}
-        canResolveGame={canResolveGame}
         gameResult={gameResult}
         isViewingResults={isViewingResults}
         onViewResults={onViewResults}
+        setModalMode={setModalMode}
+        setShowMoveSelector={setShowMoveSelector}
+        isSubmittingMove={isSubmittingMove}
       />
     </div>
   );

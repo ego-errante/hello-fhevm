@@ -33,6 +33,12 @@ contract RockPaperScissors is SepoliaConfig {
     /// @notice Counter for generating unique game IDs
     uint256 private _nextGameId = 1;
 
+    /// @notice Get the next game ID (public getter for latest game ID = nextGameId - 1)
+    /// @return The next game ID to be assigned
+    function getNextGameId() external view returns (uint256) {
+        return _nextGameId;
+    }
+
     /// @notice Events
     event GameCreated(uint256 indexed gameId, address indexed player1);
     event MoveSubmitted(uint256 indexed gameId, address indexed player);
@@ -50,17 +56,6 @@ contract RockPaperScissors is SepoliaConfig {
         _games[gameId].status = GameStatus.Created;
         _games[gameId].createdAt = block.timestamp;
         _games[gameId].resolvedAt = 0;
-        // _games[gameId] = Game({
-        //     player1: msg.sender,
-        //     player2: address(0),
-        //     move1: FHE.asEuint8(0), // Initialize with zero (uninitialized state)
-        //     move2: FHE.asEuint8(0), // Initialize with zero (uninitialized state)
-        //     result: FHE.asEuint8(0), // Initialize with zero (unresolved state)
-        //     status: GameStatus.Created,
-        //     player1Submitted: false,
-        //     createdAt: block.timestamp,
-        //     resolvedAt: 0
-        // });
 
         emit GameCreated(gameId, msg.sender);
     }
