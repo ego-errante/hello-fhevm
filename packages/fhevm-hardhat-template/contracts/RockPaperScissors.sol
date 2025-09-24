@@ -43,7 +43,6 @@ contract RockPaperScissors is SepoliaConfig {
     event GameCreated(uint256 indexed gameId, address indexed player1);
     event MoveSubmitted(uint256 indexed gameId, address indexed player);
     event GameResolved(uint256 indexed gameId);
-    event GameResultRevealed(uint256 indexed gameId, uint8 player1Move, uint8 player2Move, uint8 result);
 
     /// @notice Creates a new game
     /// @return gameId The unique identifier for the new game
@@ -201,29 +200,6 @@ contract RockPaperScissors is SepoliaConfig {
         emit GameResolved(gameId);
     }
 
-
-    /// @notice Gets the encrypted game result for client-side decryption
-    /// @param gameId The game identifier
-    /// @return result The encrypted result (decrypt client-side: 0=draw, 1=player1 wins, 2=player2 wins)
-    function getResult(uint256 gameId) external view returns (euint8 result) {
-        Game storage game = _games[gameId];
-        require(game.player1 != address(0), "Game does not exist");
-        require(game.status == GameStatus.Resolved, "Game must be resolved first");
-
-        return game.result;
-    }
-
-    /// @notice Gets only the encrypted result for client-side decryption (moves are kept private)
-    /// @param gameId The game identifier
-    /// @return result The encrypted result (decrypt client-side: 0=draw, 1=player1 wins, 2=player2 wins)
-    /// @dev Individual moves are never exposed to maintain privacy
-    function getGameData(uint256 gameId) external view returns (euint8 result) {
-        Game storage game = _games[gameId];
-        require(game.player1 != address(0), "Game does not exist");
-        require(game.status == GameStatus.Resolved, "Game must be resolved first");
-
-        return game.result;
-    }
 
     /// @notice Allows a player to decrypt their own move only (for verification purposes)
     /// @param gameId The game identifier

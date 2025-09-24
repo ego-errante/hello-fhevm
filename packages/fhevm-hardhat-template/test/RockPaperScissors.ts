@@ -349,7 +349,8 @@ describe("RockPaperScissors", function () {
       it("should correctly identify draws", async function () {
         await submitBothMoves(0, 0); // Rock vs Rock
 
-        const result = await rockPaperScissorsContract.connect(signers.alice).getResult(gameId);
+        const gameData = await rockPaperScissorsContract.connect(signers.alice).getGame(gameId);
+        const result = gameData.result;
         const decryptedResult = await fhevm.userDecryptEuint(
           FhevmType.euint8,
           result,
@@ -395,7 +396,8 @@ describe("RockPaperScissors", function () {
             .connect(signers.bob)
             .submitEncryptedMove(testGameId, p2EncryptedMove.handles[0], p2EncryptedMove.inputProof);
 
-          const result = await rockPaperScissorsContract.connect(signers.bob).getResult(testGameId);
+          const gameData = await rockPaperScissorsContract.connect(signers.bob).getGame(testGameId);
+          const result = gameData.result;
           const decryptedResult = await fhevm.userDecryptEuint(
             FhevmType.euint8,
             result,
@@ -442,7 +444,8 @@ describe("RockPaperScissors", function () {
             .connect(signers.bob)
             .submitEncryptedMove(testGameId, p2EncryptedMove.handles[0], p2EncryptedMove.inputProof);
 
-          const result = await rockPaperScissorsContract.connect(signers.bob).getResult(testGameId);
+          const gameData = await rockPaperScissorsContract.connect(signers.bob).getGame(testGameId);
+          const result = gameData.result;
           const decryptedResult = await fhevm.userDecryptEuint(
             FhevmType.euint8,
             result,
@@ -485,15 +488,18 @@ describe("RockPaperScissors", function () {
     });
 
     it("should allow players to access only the result", async function () {
-      const result = await rockPaperScissorsContract.connect(signers.alice).getResult(gameId);
+      const gameData = await rockPaperScissorsContract.connect(signers.alice).getGame(gameId);
+      const result = gameData.result;
       expect(result).to.not.equal(ethers.ZeroHash);
 
-      const result2 = await rockPaperScissorsContract.connect(signers.bob).getResult(gameId);
+      const gameData2 = await rockPaperScissorsContract.connect(signers.bob).getGame(gameId);
+      const result2 = gameData2.result;
       expect(result2).to.equal(result);
     });
 
     it("should allow players to decrypt the result", async function () {
-      const result = await rockPaperScissorsContract.connect(signers.alice).getResult(gameId);
+      const gameData = await rockPaperScissorsContract.connect(signers.alice).getGame(gameId);
+      const result = gameData.result;
       expect(result).to.not.equal(ethers.ZeroHash);
 
       const decryptedResult = await fhevm.userDecryptEuint(
@@ -518,7 +524,8 @@ describe("RockPaperScissors", function () {
     });
 
     it("should allow anyone to access the result", async function () {
-      const result = await rockPaperScissorsContract.connect(signers.charlie).getResult(gameId);
+      const gameData = await rockPaperScissorsContract.connect(signers.charlie).getGame(gameId);
+      const result = gameData.result;
       expect(result).to.not.equal(ethers.ZeroHash);
     });
 
@@ -572,16 +579,18 @@ describe("RockPaperScissors", function () {
       );
     });
 
-    it("should prevent accessing data before game is resolved", async function () {
+    it("should allow accessing game data before game is resolved", async function () {
       // Create a new unresolved game
       const tx = await rockPaperScissorsContract.connect(signers.alice).createGame();
       const receipt = await tx.wait();
       const newGameId = extractGameId(receipt, rockPaperScissorsContract)!;
 
-      await expect(rockPaperScissorsContract.connect(signers.alice).getResult(newGameId)).to.be.revertedWith(
-        "Game must be resolved first",
-      );
+      // getGame should work even for unresolved games
+      const gameData = await rockPaperScissorsContract.connect(signers.alice).getGame(newGameId);
+      expect(gameData.player1).to.equal(signers.alice.address);
+      expect(gameData.status).to.equal(0); // Created
 
+      // But getMyMove should still require the game to be resolved
       await expect(rockPaperScissorsContract.connect(signers.alice).getMyMove(newGameId)).to.be.revertedWith(
         "Game must be resolved first",
       );

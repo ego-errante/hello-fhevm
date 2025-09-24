@@ -47,37 +47,6 @@ export const RockPaperScissorsABI = {
           "type": "uint256"
         },
         {
-          "indexed": false,
-          "internalType": "uint8",
-          "name": "player1Move",
-          "type": "uint8"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint8",
-          "name": "player2Move",
-          "type": "uint8"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint8",
-          "name": "result",
-          "type": "uint8"
-        }
-      ],
-      "name": "GameResultRevealed",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "gameId",
-          "type": "uint256"
-        },
-        {
           "indexed": true,
           "internalType": "address",
           "name": "player",
@@ -162,25 +131,6 @@ export const RockPaperScissorsABI = {
           "type": "uint256"
         }
       ],
-      "name": "getGameData",
-      "outputs": [
-        {
-          "internalType": "euint8",
-          "name": "result",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "gameId",
-          "type": "uint256"
-        }
-      ],
       "name": "getMyMove",
       "outputs": [
         {
@@ -200,25 +150,6 @@ export const RockPaperScissorsABI = {
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "gameId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getResult",
-      "outputs": [
-        {
-          "internalType": "euint8",
-          "name": "result",
-          "type": "bytes32"
         }
       ],
       "stateMutability": "view",

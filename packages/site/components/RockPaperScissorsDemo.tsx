@@ -7,7 +7,7 @@ import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSign
 import { useRockPaperScissors } from "../hooks/useRockPaperScissors";
 import { errorNotDeployed } from "./ErrorNotDeployed";
 import { RockPaperScissorsABI } from "@/abi/RockPaperScissorsABI";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FaHandRock,
   FaHandPaper,
@@ -72,6 +72,9 @@ export const RockPaperScissorsDemo = () => {
     userAddress: accounts?.[0] as `0x${string}` | undefined,
   });
 
+  // Get detailed message from hook
+  const message = rockPaperScissors.message;
+
   //////////////////////////////////////////////////////////////////////////////
   // UI Stuff:
   // --------
@@ -114,7 +117,9 @@ export const RockPaperScissorsDemo = () => {
   }
 
   const handleSubmitMove = async () => {
+    console.log("handleSubmitMove", selectedMove);
     if (selectedMove !== null) {
+      console.log("submitting encrypted move");
       // Start the async operation but close modal immediately (optimistic UI)
       rockPaperScissors.submitEncryptedMove(selectedMove);
       setShowMoveSelector(false);
@@ -145,14 +150,15 @@ export const RockPaperScissorsDemo = () => {
     try {
       const gameId = rockPaperScissors.latestGame.gameId;
 
-      // Use ethers.js to call the contract's getResult function
+      // Use ethers.js to call the contract's getGame function
       const contract = new ethers.Contract(
         rockPaperScissors.contractAddress,
         RockPaperScissorsABI.abi,
         ethersSigner
       );
 
-      const encryptedResult = await contract.getResult(gameId);
+      const gameData = await contract.getGame(gameId);
+      const encryptedResult = gameData.result;
 
       // Generate/ensure decryption signature exists (only when viewing results)
       await rockPaperScissors.generateDecryptionSignature();
@@ -233,7 +239,7 @@ export const RockPaperScissorsDemo = () => {
             fhevmError={fhevmError ?? null}
           />
           <GameStatusSection
-            gameDisplayState={rockPaperScissors.gameDisplayState}
+            userGameRole={rockPaperScissors.userGameRole}
             latestGameId={rockPaperScissors.latestGame?.gameId?.toString()}
             isCreatingGame={rockPaperScissors.isCreatingGame}
             isSubmittingMove={rockPaperScissors.isSubmittingMove}
@@ -245,10 +251,12 @@ export const RockPaperScissorsDemo = () => {
         gameData={rockPaperScissors.latestGame?.data}
         gameId={rockPaperScissors.latestGame?.gameId ?? null}
         userAddress={accounts?.[0] as `0x${string}` | undefined}
+        userGameRole={rockPaperScissors.userGameRole}
         onCreateGame={rockPaperScissors.createGame}
         onSubmitMove={() => setShowMoveSelector(true)}
         canCreateGame={rockPaperScissors.canCreateGame ?? false}
         canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
+        canJoinGame={rockPaperScissors.canJoinGame ?? false}
         gameResult={gameResult}
         isViewingResults={isViewingResults}
         onViewResults={handleViewResults}
@@ -257,7 +265,7 @@ export const RockPaperScissorsDemo = () => {
         isSubmittingMove={rockPaperScissors.isSubmittingMove}
       />
 
-      <MessageSection message={rockPaperScissors.message} />
+      <MessageSection message={message} />
 
       {/* Move Selector Modal */}
       {showMoveSelector && (
@@ -333,12 +341,12 @@ function FhevmInstanceSection({
 }
 
 function GameStatusSection({
-  gameDisplayState,
+  userGameRole,
   latestGameId,
   isCreatingGame,
   isSubmittingMove,
 }: {
-  gameDisplayState: string;
+  userGameRole: string;
   latestGameId: string | undefined;
   isCreatingGame: boolean;
   isSubmittingMove: boolean;
@@ -346,7 +354,7 @@ function GameStatusSection({
   return (
     <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
       <p className="font-semibold text-black text-lg mt-4">Game Status</p>
-      {printProperty("Game Display State", gameDisplayState)}
+      {printProperty("User Game Role", userGameRole)}
       {printProperty("Latest Game ID", latestGameId)}
       {printProperty("Is Creating Game", isCreatingGame)}
       {printProperty("Is Submitting Move", isSubmittingMove)}
@@ -354,21 +362,8 @@ function GameStatusSection({
   );
 }
 
-function RoleIndicator({
-  gameData,
-  userAddress,
-}: {
-  gameData: any;
-  userAddress: `0x${string}` | undefined;
-}) {
-  const isPlayer1 = gameData?.player1 === userAddress;
-  const isPlayer2 = gameData?.player2 === userAddress;
-  const canJoin =
-    gameData &&
-    gameData.status === BigInt(1) &&
-    gameData.player2 === "0x0000000000000000000000000000000000000000";
-
-  if (isPlayer1) {
+function RoleIndicator({ userGameRole }: { userGameRole: string }) {
+  if (userGameRole === "player1") {
     return (
       <div className="text-sm">
         <span className="font-medium">Your Role:</span> Player 1
@@ -376,7 +371,7 @@ function RoleIndicator({
     );
   }
 
-  if (isPlayer2) {
+  if (userGameRole === "player2") {
     return (
       <div className="text-sm">
         <span className="font-medium">Your Role:</span> Player 2
@@ -384,7 +379,9 @@ function RoleIndicator({
     );
   }
 
-  if (canJoin) {
+  // Check if user can join (when game status is 1 and player2 slot is empty)
+  // This is handled by the hook's canSubmitMove logic, but we show "Available to join" for no_role users
+  if (userGameRole === "no_role") {
     return (
       <div className="text-sm">
         <span className="font-medium">Available to join</span>
@@ -392,22 +389,21 @@ function RoleIndicator({
     );
   }
 
-  return null; // No role indicator for "no game" state
+  return null;
 }
 
 function OpponentInfo({
   gameData,
   userAddress,
+  userGameRole,
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
 }) {
-  const isPlayer1 = gameData?.player1 === userAddress;
-  const isPlayer2 = gameData?.player2 === userAddress;
-
   if (!gameData) return null;
 
-  if (isPlayer1) {
+  if (userGameRole === "player1") {
     const hasOpponent =
       gameData.player2 &&
       gameData.player2 !== "0x0000000000000000000000000000000000000000";
@@ -421,7 +417,7 @@ function OpponentInfo({
     );
   }
 
-  if (isPlayer2) {
+  if (userGameRole === "player2") {
     return (
       <div className="text-sm">
         <span className="font-medium">Opponent:</span>
@@ -442,9 +438,11 @@ function OpponentInfo({
 function StatusIndicator({
   gameData,
   userAddress,
+  userGameRole,
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
 }) {
   if (!gameData) {
     return (
@@ -452,22 +450,21 @@ function StatusIndicator({
     );
   }
 
-  const isPlayer1 = gameData.player1 === userAddress;
-  const isPlayer2 = gameData.player2 === userAddress;
-
   if (gameData.status === BigInt(0)) {
     return (
       <div className="text-sm">
         <span className="font-medium">Status:</span>
         <p className="text-xs mt-1">
-          {isPlayer1 ? "Submit your move" : "Waiting for Player 1's move"}
+          {userGameRole === "player1"
+            ? "Submit your move"
+            : "Waiting for Player 1's move"}
         </p>
       </div>
     );
   }
 
   if (gameData.status === BigInt(1)) {
-    if (isPlayer2) {
+    if (userGameRole === "player2") {
       return (
         <div className="text-sm">
           <span className="font-medium">Status:</span>
@@ -499,10 +496,12 @@ function StatusIndicator({
 function ActionButtons({
   gameData,
   userAddress,
+  userGameRole,
   onCreateGame,
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
+  canJoinGame,
   onViewResults,
   isViewingResults,
   setModalMode,
@@ -511,30 +510,32 @@ function ActionButtons({
 }: {
   gameData: any;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
   onCreateGame: () => void;
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
+  canJoinGame: boolean;
   onViewResults: () => void;
   isViewingResults: boolean;
   setModalMode: (mode: "join" | "submit") => void;
   setShowMoveSelector: (show: boolean) => void;
   isSubmittingMove: boolean;
 }) {
-  // if (!gameData) {
-  //   // No game state - show start new game
-  //   return (
-  //     <div className="pt-2">
-  //       <button
-  //         onClick={onCreateGame}
-  //         disabled={!canCreateGame}
-  //         className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
-  //       >
-  //         Start New Game
-  //       </button>
-  //     </div>
-  //   );
-  // }
+  if (!gameData) {
+    // No game state - show start new game
+    return (
+      <div className="pt-2">
+        <button
+          onClick={onCreateGame}
+          disabled={!canCreateGame}
+          className="w-full bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 disabled:bg-gray-400"
+        >
+          Start New Game
+        </button>
+      </div>
+    );
+  }
 
   if (isSubmittingMove) {
     return (
@@ -546,14 +547,7 @@ function ActionButtons({
     );
   }
 
-  const isPlayer1 = gameData.player1 === userAddress;
-  const isPlayer2 = gameData.player2 === userAddress;
-  const canJoin =
-    gameData.status === BigInt(1) &&
-    gameData.player2 === "0x0000000000000000000000000000000000000000" &&
-    !isPlayer1;
-
-  if (canJoin) {
+  if (canJoinGame && userGameRole === "no_role") {
     // Can join existing game
     return (
       <div className="pt-2">
@@ -570,7 +564,7 @@ function ActionButtons({
     );
   }
 
-  if (isPlayer2) {
+  if (userGameRole === "player2") {
     // Player 2 - always show view results and new game buttons
     return (
       <div className="pt-2 space-y-2">
@@ -595,54 +589,56 @@ function ActionButtons({
   }
 
   // Player 1 logic based on status
-  if (gameData.status === BigInt(0)) {
-    // Waiting for moves - show submit move
-    return (
-      <div className="pt-2 space-y-2">
-        <button
-          onClick={onSubmitMove}
-          disabled={!canSubmitMove}
-          className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          Submit Your Move
-        </button>
-      </div>
-    );
-  }
-
-  if (gameData.status === BigInt(1)) {
-    // Waiting for Player 2 - show waiting status
-    return (
-      <div className="pt-2 space-y-2">
-        <div className="text-center text-gray-500 text-sm">
-          Waiting for Player 2 to join...
-        </div>
-      </div>
-    );
-  }
-
-  if (gameData.status === BigInt(2)) {
-    // Game resolved - show view results and new game
-    return (
-      <div className="pt-2 space-y-2">
-        <div className="flex gap-2">
+  if (userGameRole === "player1") {
+    if (gameData.status === BigInt(0)) {
+      // Waiting for moves - show submit move
+      return (
+        <div className="pt-2 space-y-2">
           <button
-            onClick={onViewResults}
-            disabled={isViewingResults}
-            className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+            onClick={onSubmitMove}
+            disabled={!canSubmitMove}
+            className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {isViewingResults ? "Decrypting..." : "View Results"}
-          </button>
-          <button
-            onClick={onCreateGame}
-            disabled={!canCreateGame}
-            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
-          >
-            New Game
+            Submit Your Move
           </button>
         </div>
-      </div>
-    );
+      );
+    }
+
+    if (gameData.status === BigInt(1)) {
+      // Waiting for Player 2 - show waiting status
+      return (
+        <div className="pt-2 space-y-2">
+          <div className="text-center text-gray-500 text-sm">
+            Waiting for Player 2 to join...
+          </div>
+        </div>
+      );
+    }
+
+    if (gameData.status === BigInt(2)) {
+      // Game resolved - show view results and new game
+      return (
+        <div className="pt-2 space-y-2">
+          <div className="flex gap-2">
+            <button
+              onClick={onViewResults}
+              disabled={isViewingResults}
+              className="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+            >
+              {isViewingResults ? "Decrypting..." : "View Results"}
+            </button>
+            <button
+              onClick={onCreateGame}
+              disabled={!canCreateGame}
+              className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:bg-gray-400"
+            >
+              New Game
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Fallback
@@ -673,10 +669,12 @@ function GameStatusBox({
   gameData,
   gameId,
   userAddress,
+  userGameRole,
   onCreateGame,
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
+  canJoinGame,
   gameResult,
   isViewingResults,
   onViewResults,
@@ -687,10 +685,12 @@ function GameStatusBox({
   gameData: any;
   gameId: bigint | null;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
   onCreateGame: () => void;
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
+  canJoinGame: boolean;
   gameResult: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
@@ -703,16 +703,26 @@ function GameStatusBox({
       <div className="border rounded-lg p-4 bg-white shadow-sm">
         <h4 className="font-semibold mb-4 text-center">🎮 GAME STATUS</h4>
         <div className="space-y-3">
-          <RoleIndicator gameData={gameData} userAddress={userAddress} />
-          <OpponentInfo gameData={gameData} userAddress={userAddress} />
-          <StatusIndicator gameData={gameData} userAddress={userAddress} />
+          <RoleIndicator userGameRole={userGameRole} />
+          <OpponentInfo
+            gameData={gameData}
+            userAddress={userAddress}
+            userGameRole={userGameRole}
+          />
+          <StatusIndicator
+            gameData={gameData}
+            userAddress={userAddress}
+            userGameRole={userGameRole}
+          />
           <ActionButtons
             gameData={gameData}
             userAddress={userAddress}
+            userGameRole={userGameRole}
             onCreateGame={onCreateGame}
             onSubmitMove={onSubmitMove}
             canCreateGame={canCreateGame}
             canSubmitMove={canSubmitMove}
+            canJoinGame={canJoinGame}
             onViewResults={onViewResults}
             isViewingResults={isViewingResults}
             setModalMode={setModalMode}
@@ -735,10 +745,12 @@ function GameStatusBoxSection({
   gameData,
   gameId,
   userAddress,
+  userGameRole,
   onCreateGame,
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
+  canJoinGame,
   gameResult,
   isViewingResults,
   onViewResults,
@@ -749,10 +761,12 @@ function GameStatusBoxSection({
   gameData: any;
   gameId: bigint | null;
   userAddress: `0x${string}` | undefined;
+  userGameRole: string;
   onCreateGame: () => void;
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
+  canJoinGame: boolean;
   gameResult: string | null;
   isViewingResults: boolean;
   onViewResults: () => void;
@@ -766,10 +780,12 @@ function GameStatusBoxSection({
         gameData={gameData}
         gameId={gameId}
         userAddress={userAddress}
+        userGameRole={userGameRole}
         onCreateGame={onCreateGame}
         onSubmitMove={onSubmitMove}
         canCreateGame={canCreateGame}
         canSubmitMove={canSubmitMove}
+        canJoinGame={canJoinGame}
         gameResult={gameResult}
         isViewingResults={isViewingResults}
         onViewResults={onViewResults}

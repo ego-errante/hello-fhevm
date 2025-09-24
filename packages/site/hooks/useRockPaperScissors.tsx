@@ -1,14 +1,8 @@
 "use client";
 
 import { ethers } from "ethers";
-import {
-  RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { RefObject, useCallback, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   FhevmDecryptionSignature,
@@ -33,7 +27,7 @@ export type GameData = {
   move1: string;
   move2: string;
   result: string;
-  status: bigint;
+  status: number;
   createdAt: bigint;
   resolvedAt: bigint;
 };
@@ -102,22 +96,17 @@ export const useRockPaperScissors = (parameters: {
     userAddress,
   } = parameters;
 
+  const queryClient = useQueryClient();
+
   //////////////////////////////////////////////////////////////////////////////
   // States + Refs
   //////////////////////////////////////////////////////////////////////////////
 
-  const [isCreatingGame, setIsCreatingGame] = useState<boolean>(false);
-  const [isSubmittingMove, setIsSubmittingMove] = useState<boolean>(false);
-  const [message, setMessage] = useState<string>("");
-  const [latestGameData, setLatestGameData] = useState<LatestGame | null>(null);
-  const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false);
-
   const rockPaperScissorsRef = useRef<RockPaperScissorsInfoType | undefined>(
     undefined
   );
-  const isCreatingGameRef = useRef<boolean>(isCreatingGame);
-  const isSubmittingMoveRef = useRef<boolean>(isSubmittingMove);
-  const isLoadingGamesRef = useRef<boolean>(isLoadingGames);
+
+  const [message, setMessage] = useState<string>("");
 
   //////////////////////////////////////////////////////////////////////////////
   // RockPaperScissors Contract
@@ -127,14 +116,6 @@ export const useRockPaperScissors = (parameters: {
     const c = getRockPaperScissorsByChainId(chainId);
 
     rockPaperScissorsRef.current = c;
-
-    if (!c.address) {
-      setMessage(
-        `RockPaperScissors deployment not found for chainId=${chainId}.`
-      );
-    } else {
-      setMessage("");
-    }
 
     return c;
   }, [chainId]);
@@ -152,57 +133,30 @@ export const useRockPaperScissors = (parameters: {
   //////////////////////////////////////////////////////////////////////////////
   // Game Detection Logic - Find the latest game
   //////////////////////////////////////////////////////////////////////////////
-  const updateLatestGameData = useCallback(
-    (
-      gameId: bigint | null,
-      data: GameData | null,
-      isLoading: boolean = false,
-      thisChainId: number,
-      thisRockPaperScissorsAddress: string
-    ) => {
+
+  const { data: latestGame, isLoading: isLoadingGames } = useQuery({
+    queryKey: [
+      "rock-paper-scissors",
+      "latest-game",
+      chainId,
+      rockPaperScissors.address,
+    ],
+    queryFn: async (): Promise<LatestGame | null> => {
       if (
-        sameChain.current(thisChainId) &&
-        thisRockPaperScissorsAddress === rockPaperScissorsRef.current?.address
+        !rockPaperScissorsRef.current ||
+        !rockPaperScissorsRef.current?.chainId ||
+        !rockPaperScissorsRef.current?.address ||
+        !ethersReadonlyProvider
       ) {
-        if (gameId && data) {
-          setLatestGameData({ gameId, data, isLoading });
-        } else {
-          setLatestGameData(null);
-        }
+        return null;
       }
-    },
-    [sameChain]
-  );
 
-  const refreshLatestGame = useCallback(() => {
-    if (isLoadingGamesRef.current) {
-      return;
-    }
+      const thisRockPaperScissorsContract = new ethers.Contract(
+        rockPaperScissorsRef.current.address,
+        rockPaperScissorsRef.current.abi,
+        ethersReadonlyProvider
+      );
 
-    if (
-      !rockPaperScissorsRef.current ||
-      !rockPaperScissorsRef.current?.chainId ||
-      !rockPaperScissorsRef.current?.address ||
-      !ethersReadonlyProvider
-    ) {
-      setLatestGameData(null);
-      return;
-    }
-
-    isLoadingGamesRef.current = true;
-    setIsLoadingGames(true);
-
-    const thisChainId = rockPaperScissorsRef.current.chainId;
-    const thisRockPaperScissorsAddress = rockPaperScissorsRef.current.address;
-
-    const thisRockPaperScissorsContract = new ethers.Contract(
-      thisRockPaperScissorsAddress,
-      rockPaperScissorsRef.current.abi,
-      ethersReadonlyProvider
-    );
-
-    // Get the most recent game using the public getter
-    const checkGames = async () => {
       try {
         // Get the next game ID and check the latest game (nextGameId - 1)
         const nextGameId = await thisRockPaperScissorsContract.getNextGameId();
@@ -210,66 +164,57 @@ export const useRockPaperScissors = (parameters: {
 
         if (latestGameId <= BigInt(0)) {
           // No games exist yet
-          updateLatestGameData(
-            null,
-            null,
-            false,
-            thisChainId,
-            thisRockPaperScissorsAddress
-          );
-          return;
+          return null;
         }
 
-        const gameData = (await thisRockPaperScissorsContract.getGame(
-          latestGameId
-        )) as GameData;
+        const gameDataResult =
+          await thisRockPaperScissorsContract.getGame(latestGameId);
 
-        updateLatestGameData(
-          latestGameId,
-          gameData,
-          false,
-          thisChainId,
-          thisRockPaperScissorsAddress
-        );
+        // Convert ethers.Result to a proper object to ensure consistency
+        const gameData: GameData = {
+          player1: gameDataResult[0] as `0x${string}`,
+          player2: gameDataResult[1] as `0x${string}`,
+          move1: gameDataResult[2] as string,
+          move2: gameDataResult[3] as string,
+          result: gameDataResult[4] as string,
+          status: gameDataResult[5] as number,
+          createdAt: gameDataResult[6] as bigint,
+          resolvedAt: gameDataResult[7] as bigint,
+        };
+
+        return {
+          gameId: latestGameId,
+          data: gameData,
+          isLoading: false,
+        };
       } catch (error) {
-        setMessage("Failed to fetch latest game: " + (error as Error).message);
-        updateLatestGameData(
-          null,
-          null,
-          false,
-          thisChainId,
-          thisRockPaperScissorsAddress
-        );
-      } finally {
-        isLoadingGamesRef.current = false;
-        setIsLoadingGames(false);
+        console.error("Failed to fetch latest game:", error);
+        throw error;
       }
-    };
-
-    checkGames();
-  }, [ethersReadonlyProvider, sameChain, updateLatestGameData]);
-
-  // Auto refresh the latest game
-  useEffect(() => {
-    refreshLatestGame();
-  }, [refreshLatestGame]);
-
-  const latestGame = latestGameData;
+    },
+    enabled: !!rockPaperScissors.address && !!ethersReadonlyProvider,
+    refetchInterval: 3000, // Auto-refresh every 3 seconds
+    retry: 3,
+  });
 
   //////////////////////////////////////////////////////////////////////////////
   // Game State Determination
   //////////////////////////////////////////////////////////////////////////////
 
-  const gameDisplayState = useMemo(() => {
-    if (!userAddress || !latestGame) {
-      return "no_game";
+  const userGameRole = useMemo(() => {
+    console.log("============");
+    console.log("got here 1");
+    console.log("userAddress", userAddress);
+    console.log("latestGame data", latestGame?.data);
+    if (!userAddress || !latestGame?.data) {
+      return "no_role";
     }
 
+    console.log("got here 2");
     const { data: gameData } = latestGame;
-    if (!gameData) {
-      console.log("gameDisplayState: no_game (no gameData)");
-      return "no_game";
-    }
+
+    console.log("gameData.player1", gameData.player1);
+    console.log("gameData.player2", gameData.player2);
 
     const isPlayer1 =
       gameData.player1?.toLowerCase() === userAddress?.toLowerCase();
@@ -284,7 +229,8 @@ export const useRockPaperScissors = (parameters: {
       return "player2";
     }
 
-    return "no_game";
+    console.log("got here 3");
+    return "no_role";
   }, [userAddress, latestGame]);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -299,42 +245,29 @@ export const useRockPaperScissors = (parameters: {
     return (
       rockPaperScissors.address &&
       ethersSigner &&
-      !isCreatingGame &&
       Number(latestGame?.data?.result) !== 0
     );
-  }, [
-    rockPaperScissors.address,
-    ethersSigner,
-    isCreatingGame,
-    gameDisplayState,
-  ]);
+  }, [rockPaperScissors.address, ethersSigner, latestGame?.data?.result]);
 
-  const createGame = useCallback(async () => {
-    if (!canCreateGame || !ethersSigner) return;
+  const createGameMutation = useMutation({
+    mutationFn: async () => {
+      if (!rockPaperScissors.address || !ethersSigner) {
+        throw new Error("Contract or signer not available");
+      }
 
-    const thisChainId = chainId;
-    const thisRockPaperScissorsAddress = rockPaperScissors.address!;
-    const thisEthersSigner = ethersSigner;
+      if (!canCreateGame) {
+        throw new Error("Cannot create game");
+      }
 
-    const thisRockPaperScissorsContract = new ethers.Contract(
-      thisRockPaperScissorsAddress,
-      rockPaperScissors.abi,
-      thisEthersSigner
-    );
+      setMessage("Creating new game...");
 
-    isCreatingGameRef.current = true;
-    setIsCreatingGame(true);
-    setMessage("Creating new game...");
+      const contract = new ethers.Contract(
+        rockPaperScissors.address,
+        rockPaperScissors.abi,
+        ethersSigner
+      );
 
-    try {
-      const isStale = () =>
-        thisRockPaperScissorsAddress !==
-          rockPaperScissorsRef.current?.address ||
-        !sameChain.current(thisChainId) ||
-        !sameSigner.current(thisEthersSigner);
-
-      const tx: ethers.TransactionResponse =
-        await thisRockPaperScissorsContract.createGame();
+      const tx = await contract.createGame();
 
       setMessage(`Waiting for transaction: ${tx.hash}...`);
 
@@ -342,139 +275,123 @@ export const useRockPaperScissors = (parameters: {
 
       setMessage(`Game created! Status: ${receipt?.status}`);
 
-      if (!isStale()) {
-        refreshLatestGame();
-      }
-    } catch (error) {
+      return receipt;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch the latest game query
+      queryClient.invalidateQueries({
+        queryKey: ["rock-paper-scissors", "latest-game"],
+      });
+    },
+    onError: (error) => {
       setMessage("Failed to create game: " + (error as Error).message);
-    } finally {
-      isCreatingGameRef.current = false;
-      setIsCreatingGame(false);
+    },
+  });
+
+  const canJoinGame = useMemo((): boolean => {
+    if (
+      !rockPaperScissors.address ||
+      !latestGame?.data ||
+      userGameRole !== "no_role"
+    ) {
+      return false;
     }
-  }, [
-    canCreateGame,
-    ethersSigner,
-    rockPaperScissors.address,
-    rockPaperScissors.abi,
-    chainId,
-    sameChain,
-    sameSigner,
-    refreshLatestGame,
-  ]);
+
+    const gameStatus = Number(latestGame.data.status);
+
+    return (
+      gameStatus === 1 &&
+      latestGame.data.player2 === "0x0000000000000000000000000000000000000000"
+    );
+  }, [rockPaperScissors.address, latestGame?.data, userGameRole]);
 
   const canSubmitMove = useMemo((): boolean => {
-    return Boolean(
-      rockPaperScissors.address &&
-        instance &&
-        ethersSigner &&
-        !isSubmittingMove &&
-        gameDisplayState === "player1" &&
-        latestGame?.gameId
-    );
+    if (
+      !rockPaperScissors.address ||
+      !instance ||
+      !ethersSigner ||
+      !latestGame?.gameId ||
+      !latestGame?.data
+    ) {
+      return false;
+    }
+
+    const gameStatus = Number(latestGame.data.status);
+
+    // Player1 can submit when game is Created (status = 0)
+    if (userGameRole === "player1" && gameStatus === 0) {
+      return true;
+    }
+
+    // Player2 can submit when Player1 has submitted (status = 1)
+    if (userGameRole === "no_role" && gameStatus === 1) {
+      return true;
+    }
+
+    return false;
   }, [
     rockPaperScissors.address,
     instance,
     ethersSigner,
-    isSubmittingMove,
-    gameDisplayState,
+    userGameRole,
     latestGame?.gameId,
+    latestGame?.data?.status,
   ]);
 
-  const submitEncryptedMove = useCallback(
-    async (move: number) => {
-      if (!canSubmitMove || !latestGame?.gameId || !instance || !ethersSigner)
-        return;
+  const submitMoveMutation = useMutation({
+    mutationFn: async (move: number) => {
+      if (
+        !rockPaperScissors.address ||
+        !instance ||
+        !ethersSigner ||
+        !latestGame?.gameId
+      ) {
+        throw new Error("Prerequisites not met for submitting move");
+      }
 
-      const thisChainId = chainId;
-      const thisRockPaperScissorsAddress = rockPaperScissors.address!;
-      const thisEthersSigner = ethersSigner;
-      const thisGameId = latestGame.gameId;
+      if (!canSubmitMove) {
+        throw new Error("Cannot submit move");
+      }
 
-      const thisRockPaperScissorsContract = new ethers.Contract(
-        thisRockPaperScissorsAddress,
-        rockPaperScissors.abi,
-        thisEthersSigner
-      );
-
-      isSubmittingMoveRef.current = true;
-      setIsSubmittingMove(true);
       setMessage("Encrypting your move...");
 
-      try {
-        const isStale = () =>
-          thisRockPaperScissorsAddress !==
-            rockPaperScissorsRef.current?.address ||
-          !sameChain.current(thisChainId) ||
-          !sameSigner.current(thisEthersSigner);
+      const contract = new ethers.Contract(
+        rockPaperScissors.address!,
+        rockPaperScissors.abi,
+        ethersSigner
+      );
 
-        console.log("move: ", move);
-        const encryptedMove = await instance
-          .createEncryptedInput(
-            thisRockPaperScissorsAddress,
-            thisEthersSigner.address
-          )
-          .add8(move)
-          .encrypt();
+      const encryptedMove = await instance
+        .createEncryptedInput(rockPaperScissors.address, ethersSigner.address)
+        .add8(move)
+        .encrypt();
 
-        if (isStale()) {
-          setMessage("Ignore submit move");
-          return;
-        }
+      setMessage("Submitting encrypted move...");
 
-        setMessage("Submitting encrypted move...");
+      const tx = await contract.submitEncryptedMove(
+        latestGame.gameId,
+        `0x${Buffer.from(encryptedMove.handles[0]).toString("hex")}`,
+        `0x${Buffer.from(encryptedMove.inputProof).toString("hex")}`
+      );
 
-        const tx: ethers.TransactionResponse =
-          await thisRockPaperScissorsContract.submitEncryptedMove(
-            thisGameId,
-            `0x${Buffer.from(encryptedMove.handles[0]).toString("hex")}`,
-            `0x${Buffer.from(encryptedMove.inputProof).toString("hex")}`
-          );
+      setMessage(`Waiting for transaction: ${tx.hash}...`);
 
-        setMessage(`Waiting for transaction: ${tx.hash}...`);
+      const receipt = await tx.wait();
 
-        const receipt = await tx.wait();
+      setMessage(`Move submitted! Status: ${receipt?.status}`);
 
-        setMessage(`Move submitted! Status: ${receipt?.status}`);
-
-        if (!isStale()) {
-          refreshLatestGame();
-        }
-      } catch (error) {
-        setMessage("Failed to submit move: " + (error as Error).message);
-      } finally {
-        isSubmittingMoveRef.current = false;
-        setIsSubmittingMove(false);
-      }
+      return receipt;
     },
-    [
-      canSubmitMove,
-      latestGame?.gameId,
-      instance,
-      ethersSigner,
-      rockPaperScissors.address,
-      rockPaperScissors.abi,
-      chainId,
-      sameChain,
-      sameSigner,
-      refreshLatestGame,
-    ]
-  );
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Status Updates
-  //////////////////////////////////////////////////////////////////////////////
-
-  useEffect(() => {
-    isCreatingGameRef.current = isCreatingGame;
-  }, [isCreatingGame]);
-
-  useEffect(() => {
-    isSubmittingMoveRef.current = isSubmittingMove;
-  }, [isSubmittingMove]);
-
-  useEffect(() => {
-    isLoadingGamesRef.current = isLoadingGames;
-  }, [isLoadingGames]);
+    onSuccess: () => {
+      // Invalidate and refetch the latest game query
+      queryClient.invalidateQueries({
+        queryKey: ["rock-paper-scissors", "latest-game"],
+      });
+    },
+    onError: (error) => {
+      setMessage("Failed to submit move: " + (error as Error).message);
+    },
+  });
 
   // Generate decryption signature when needed (called from component)
   const generateDecryptionSignature = useCallback(async () => {
@@ -519,6 +436,10 @@ export const useRockPaperScissors = (parameters: {
     fhevmDecryptionSignatureStorage,
   ]);
 
+  // Create a combined loading state for all operations
+  const isProcessing =
+    createGameMutation.isPending || submitMoveMutation.isPending;
+
   return {
     // Contract info
     contractAddress: rockPaperScissors.address,
@@ -526,19 +447,25 @@ export const useRockPaperScissors = (parameters: {
 
     // Game state
     latestGame,
-    gameDisplayState,
+    userGameRole,
 
     // Actions
     canCreateGame,
-    createGame,
+    createGame: createGameMutation.mutate,
     canSubmitMove,
-    submitEncryptedMove,
+    canJoinGame,
+    submitEncryptedMove: submitMoveMutation.mutate,
     generateDecryptionSignature,
 
-    // Status
+    // Status - unified loading states
     message,
-    isCreatingGame,
-    isSubmittingMove,
+    isCreatingGame: createGameMutation.isPending,
+    isSubmittingMove: submitMoveMutation.isPending,
     isLoadingGames,
+    isProcessing,
+
+    // Error states
+    createGameError: createGameMutation.error,
+    submitMoveError: submitMoveMutation.error,
   };
 };

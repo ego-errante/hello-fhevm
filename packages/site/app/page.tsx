@@ -1,3 +1,4 @@
+import { DummyRockPaperScissorsDemo } from "@/components/DummyRockPaperScissorsDemo";
 import { FHECounterDemo } from "@/components/FHECounterDemo";
 import { RockPaperScissorsDemo } from "@/components/RockPaperScissorsDemo";
 export default function Home() {
@@ -5,6 +6,7 @@ export default function Home() {
     <main className="">
       <div className="flex flex-col gap-8 items-center sm:items-start w-full px-3 md:px-0">
         <RockPaperScissorsDemo />
+        {/* <DummyRockPaperScissorsDemo /> */}
       </div>
     </main>
   );
