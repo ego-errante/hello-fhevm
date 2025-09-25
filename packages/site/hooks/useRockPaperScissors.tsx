@@ -203,6 +203,10 @@ function useGameActions(parameters: {
         throw new Error("Cannot create game");
       }
 
+      queryClient.resetQueries({
+        queryKey: ["rock-paper-scissors", "game-results"],
+      });
+
       setMessage("Creating new game...");
 
       const contract = new ethers.Contract(
@@ -231,23 +235,6 @@ function useGameActions(parameters: {
       setMessage("Failed to create game: " + (error as Error).message);
     },
   });
-
-  const canJoinGame = useMemo((): boolean => {
-    if (
-      !rockPaperScissors.address ||
-      !latestGame?.data ||
-      userGameRole !== "no_role"
-    ) {
-      return false;
-    }
-
-    const gameStatus = Number(latestGame.data.status);
-
-    return (
-      gameStatus === 1 &&
-      latestGame.data.player2 === "0x0000000000000000000000000000000000000000"
-    );
-  }, [rockPaperScissors.address, latestGame?.data, userGameRole]);
 
   const canSubmitMove = useMemo((): boolean => {
     if (
@@ -345,7 +332,6 @@ function useGameActions(parameters: {
     message,
     canCreateGame,
     createGameMutation,
-    canJoinGame,
     canSubmitMove,
     submitMoveMutation,
     isProcessing,
@@ -370,10 +356,6 @@ function useGameResults(parameters: {
     userGameRole,
     queryClient,
   } = parameters;
-
-  const [gameResult, setGameResult] = useState<string | null>(null);
-  const [myMove, setMyMove] = useState<string | null>(null);
-  const [isViewingResults, setIsViewingResults] = useState(false);
 
   // Generate decryption signature when needed (called from component)
   const generateDecryptionSignature = useCallback(async () => {
@@ -418,8 +400,14 @@ function useGameResults(parameters: {
     fhevmDecryptionSignatureStorage,
   ]);
 
-  const viewResultsMutation = useMutation({
-    mutationFn: async () => {
+  const gameResultsQuery = useQuery({
+    queryKey: [
+      "rock-paper-scissors",
+      "game-results",
+      latestGame?.gameId.toString(),
+      userGameRole,
+    ],
+    queryFn: async () => {
       if (
         !latestGame?.gameId ||
         !instance ||
@@ -429,10 +417,6 @@ function useGameResults(parameters: {
       ) {
         throw new Error("Prerequisites not met for viewing results");
       }
-
-      setIsViewingResults(true);
-      setGameResult(null);
-      setMyMove(null);
 
       try {
         const gameId = latestGame.gameId;
@@ -446,6 +430,7 @@ function useGameResults(parameters: {
 
         const gameData = await contract.getGame(gameId);
         const encryptedResult = gameData.result;
+        console.log("encryptedResult", encryptedResult);
         const encryptedMove1 = gameData.move1;
         const encryptedMove2 = gameData.move2;
 
@@ -507,7 +492,6 @@ function useGameResults(parameters: {
 
         const resultKey = Number(decryptedValues[encryptedResult]);
         const result = resultMap[resultKey] || "Unknown result";
-        setGameResult(result);
 
         const moveMap: { [key: number]: string } = {
           0: "Rock",
@@ -515,69 +499,31 @@ function useGameResults(parameters: {
           2: "Scissors",
         };
 
+        let myMove: string | null = null;
         if (userGameRole === "player1") {
           const moveKey = Number(decryptedValues[encryptedMove1]);
-          setMyMove(moveMap[moveKey] || "Unknown move");
+          myMove = moveMap[moveKey] || "Unknown move";
         } else if (userGameRole === "player2") {
           const moveKey = Number(decryptedValues[encryptedMove2]);
-          setMyMove(moveMap[moveKey] || "Unknown move");
+          myMove = moveMap[moveKey] || "Unknown move";
         }
 
         return { result, myMove };
       } catch (error) {
         const errorMessage =
           "Failed to load results: " + (error as Error).message;
-        setGameResult(errorMessage);
-        throw error;
-      } finally {
-        setIsViewingResults(false);
+        throw new Error(errorMessage);
       }
     },
-    onSuccess: () => {
-      // Invalidate and refetch the latest game query to get updated state
-      queryClient.invalidateQueries({
-        queryKey: ["rock-paper-scissors", "latest-game"],
-      });
-    },
+    enabled: false,
   });
 
-  const canViewResults = useMemo(() => {
-    if (
-      !latestGame?.data ||
-      !rockPaperScissors.address ||
-      !instance ||
-      !ethersSigner
-    ) {
-      return false;
-    }
-
-    const gameStatus = Number(latestGame.data.status);
-    const userGameRole = (() => {
-      if (!ethersSigner?.address) return "no_role";
-
-      const isPlayer1 =
-        latestGame.data.player1?.toLowerCase() ===
-        ethersSigner.address?.toLowerCase();
-      const isPlayer2 =
-        latestGame.data.player2 &&
-        latestGame.data.player2?.toLowerCase() ===
-          ethersSigner.address?.toLowerCase();
-
-      if (isPlayer1) return "player1";
-      if (isPlayer2) return "player2";
-      return "no_role";
-    })();
-
-    // Can view results when game is resolved (status = 2) or when you're a player and game is in progress
-    return gameStatus === 2 || (userGameRole !== "no_role" && gameStatus >= 1);
-  }, [latestGame?.data, rockPaperScissors.address, instance, ethersSigner]);
-
   return {
-    gameResult,
-    myMove,
-    isViewingResults,
-    viewResultsMutation,
-    canViewResults,
+    gameResult: gameResultsQuery.data?.result ?? null,
+    myMove: gameResultsQuery.data?.myMove ?? null,
+    isViewingResults: gameResultsQuery.isLoading,
+    fetchGameResults: gameResultsQuery.refetch,
+    error: gameResultsQuery.error,
     generateDecryptionSignature,
   };
 }
@@ -703,15 +649,13 @@ export const useRockPaperScissors = (parameters: {
     canCreateGame: gameActions.canCreateGame,
     createGame: gameActions.createGameMutation.mutate,
     canSubmitMove: gameActions.canSubmitMove,
-    canJoinGame: gameActions.canJoinGame,
     submitEncryptedMove: gameActions.submitMoveMutation.mutate,
 
     // Game results
     gameResult: gameResults.gameResult,
     myMove: gameResults.myMove,
     isViewingResults: gameResults.isViewingResults,
-    canViewResults: gameResults.canViewResults,
-    viewResults: gameResults.viewResultsMutation.mutate,
+    viewResults: gameResults.fetchGameResults,
     generateDecryptionSignature: gameResults.generateDecryptionSignature,
 
     // Status - unified loading states
@@ -724,6 +668,6 @@ export const useRockPaperScissors = (parameters: {
     // Error states
     createGameError: gameActions.createGameMutation.error,
     submitMoveError: gameActions.submitMoveMutation.error,
-    viewResultsError: gameResults.viewResultsMutation.error,
+    viewResultsError: gameResults.error,
   };
 };

@@ -19,6 +19,7 @@ import {
   FaQuestion,
   FaLock,
 } from "react-icons/fa";
+import { LuLoaderCircle } from "react-icons/lu";
 
 /*
  * Main RockPaperScissors React component with game status and controls
@@ -78,6 +79,9 @@ export const RockPaperScissorsDemo = () => {
   // Get detailed message from hook
   const message = rockPaperScissors.message;
 
+  // Get loading state for game data
+  const isLoadingGameData = rockPaperScissors.isLoadingGames;
+
   //////////////////////////////////////////////////////////////////////////////
   // UI Stuff:
   // --------
@@ -116,14 +120,12 @@ export const RockPaperScissorsDemo = () => {
   }
 
   const handleSubmitMove = async () => {
-    console.log("handleSubmitMove", selectedMove);
     if (selectedMove !== null) {
-      console.log("submitting encrypted move");
-      // Start the async operation but close modal immediately (optimistic UI)
-      rockPaperScissors.submitEncryptedMove(selectedMove);
       setShowMoveSelector(false);
       setSelectedMove(null);
       setModalMode("submit");
+      // Start the async operation but close modal immediately (optimistic UI)
+      rockPaperScissors.submitEncryptedMove(selectedMove);
     }
   };
 
@@ -152,7 +154,6 @@ export const RockPaperScissorsDemo = () => {
         onSubmitMove={() => setShowMoveSelector(true)}
         canCreateGame={rockPaperScissors.canCreateGame ?? false}
         canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
-        canJoinGame={rockPaperScissors.canJoinGame ?? false}
         gameResult={rockPaperScissors.gameResult}
         myMove={rockPaperScissors.myMove}
         isViewingResults={rockPaperScissors.isViewingResults}
@@ -161,6 +162,7 @@ export const RockPaperScissorsDemo = () => {
         setShowMoveSelector={setShowMoveSelector}
         isSubmittingMove={rockPaperScissors.isSubmittingMove}
         isCreatingGame={rockPaperScissors.isCreatingGame}
+        isLoadingGameData={isLoadingGameData}
       />
 
       <MessageSection message={message} />
@@ -267,7 +269,7 @@ function HowToPlaySection() {
     <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
       <p className="font-semibold text-black text-lg mt-4">How to Play</p>
 
-      <div className="mt-3 space-y-6 text-sm">
+      <div className="mt-3 space-y-6">
         <div>
           <p className="font-semibold mb-1">Game Rules:</p>
           <p>
@@ -453,12 +455,15 @@ function GameButton({
     secondary: "bg-slate-600 text-white hover:bg-slate-700",
     success: "bg-green-600 text-white hover:bg-green-700",
     join: "bg-blue-600 text-white hover:bg-blue-700",
-    waiting: "text-center text-gray-500 text-sm",
+    waiting:
+      "bg-gray-100 border border-gray-300 text-gray-600 text-center cursor-default",
   };
 
   if (variant === "waiting") {
     return (
-      <div className={`${baseClasses} ${variantClasses[variant]}`}>
+      <div
+        className={`${baseClasses} ${widthClass} ${variantClasses[variant]}`}
+      >
         {children}
       </div>
     );
@@ -491,7 +496,7 @@ function ActionButtons({
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
-  canJoinGame,
+
   onViewResults,
   isViewingResults,
   setModalMode,
@@ -506,7 +511,6 @@ function ActionButtons({
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
-  canJoinGame: boolean;
   onViewResults: () => void;
   isViewingResults: boolean;
   setModalMode: (mode: "join" | "submit") => void;
@@ -536,24 +540,8 @@ function ActionButtons({
     );
   }
 
-  // Can join existing game
-  if (canJoinGame && userGameRole === "no_role") {
-    return (
-      <ButtonContainer>
-        <GameButton
-          onClick={handleJoinGame}
-          disabled={isSubmittingMove}
-          variant="join"
-          fullWidth
-        >
-          {isSubmittingMove ? "Joining Game..." : "Join This Game"}
-        </GameButton>
-      </ButtonContainer>
-    );
-  }
-
-  // Player 2 - always show both buttons
-  if (userGameRole === "player2") {
+  const userHasRole = userGameRole === "player2" || userGameRole === "player1";
+  if (userHasRole && gameData.status === BigInt(2)) {
     return (
       <ButtonContainer>
         <GameButton
@@ -593,51 +581,41 @@ function ActionButtons({
       );
     }
 
-    if (status === BigInt(1)) {
-      return (
-        <ButtonContainer>
-          <GameButton variant="waiting" onClick={() => {}}>
-            Waiting for Player 2 to join...
-          </GameButton>
-        </ButtonContainer>
-      );
-    }
-
-    if (status === BigInt(2)) {
-      return (
-        <ButtonContainer>
-          <GameButton
-            onClick={onViewResults}
-            disabled={isViewingResults}
-            variant="secondary"
-          >
-            {isViewingResults ? "Decrypting..." : "View Results"}
-          </GameButton>
-          <GameButton
-            onClick={onCreateGame}
-            disabled={!canCreateGame || isCreatingGame}
-            variant="primary"
-          >
-            {isCreatingGame ? "Creating Game..." : "New Game"}
-          </GameButton>
-        </ButtonContainer>
-      );
-    }
+    // Status == 1 => Waiting for Player 2 to join
+    return (
+      <ButtonContainer>
+        <GameButton variant="waiting" onClick={() => {}} disabled>
+          Waiting for Player 2 to join...
+        </GameButton>
+      </ButtonContainer>
+    );
   }
 
-  // Fallback
-  return (
-    <ButtonContainer>
-      <GameButton
-        onClick={onCreateGame}
-        disabled={!canCreateGame}
-        variant="primary"
-        fullWidth
-      >
-        Start New Game
-      </GameButton>
-    </ButtonContainer>
-  );
+  // Last case: no role logic
+  if (gameData.status === BigInt(0)) {
+    return (
+      <ButtonContainer>
+        <GameButton onClick={() => {}} disabled variant="waiting" fullWidth>
+          Waiting for Player 1 move...
+        </GameButton>
+      </ButtonContainer>
+    );
+  }
+
+  if (gameData.status === BigInt(1)) {
+    return (
+      <ButtonContainer>
+        <GameButton
+          onClick={handleJoinGame}
+          disabled={isSubmittingMove}
+          variant="join"
+          fullWidth
+        >
+          {isSubmittingMove ? "Joining Game..." : "Join This Game"}
+        </GameButton>
+      </ButtonContainer>
+    );
+  }
 }
 
 function GameResultDetails({
@@ -718,7 +696,7 @@ function GameResultDetails({
   const styles = getOutcomeStyles(outcomeType);
 
   // Get move emoji
-  const getMoveEmoji = (move: string) => {
+  const getMoveIcon = (move: string) => {
     switch (move?.toLowerCase()) {
       case "rock":
         return <FaHandRock />;
@@ -744,7 +722,7 @@ function GameResultDetails({
       </div>
 
       {outcomeType === "error" && (
-        <p className={`text-sm ${styles.accent} mb-3`}>{gameResult}</p>
+        <p className={`text-sm ${styles.accent} my-3`}>{gameResult}</p>
       )}
 
       {myMove && outcomeType !== "error" && (
@@ -753,7 +731,7 @@ function GameResultDetails({
             <span className={`font-semibold text-black`}>
               Your move: {myMove}
             </span>
-            <span className="text-lg">{getMoveEmoji(myMove)}</span>
+            <span className="text-lg">{getMoveIcon(myMove)}</span>
           </div>
           <div className="flex items-center justify-center gap-2 text-sm">
             <FaLock />
@@ -774,7 +752,7 @@ function GameStatusBox({
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
-  canJoinGame,
+
   gameResult,
   myMove,
   isViewingResults,
@@ -783,6 +761,7 @@ function GameStatusBox({
   setShowMoveSelector,
   isSubmittingMove,
   isCreatingGame,
+  isLoadingGameData,
 }: {
   gameData: any;
   gameId: bigint | null;
@@ -792,7 +771,6 @@ function GameStatusBox({
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
-  canJoinGame: boolean;
   gameResult: string | null;
   myMove: string | null;
   isViewingResults: boolean;
@@ -801,7 +779,23 @@ function GameStatusBox({
   setShowMoveSelector: (show: boolean) => void;
   isSubmittingMove: boolean;
   isCreatingGame: boolean;
+  isLoadingGameData: boolean;
 }) {
+  // Show loading spinner when game data is loading and no game data available
+  if (isLoadingGameData && !gameData) {
+    return (
+      <>
+        <h4 className="font-semibold mb-4 text-center flex items-center justify-center gap-2">
+          <FaRegHourglass />
+          <span>GAME STATUS</span>
+        </h4>
+        <div className="flex items-center justify-center pb-8 pt-4">
+          <LuLoaderCircle className="animate-spin size-12 text-yellow-500" />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <h4 className="font-semibold mb-4 text-center flex items-center justify-center gap-2">
@@ -828,7 +822,6 @@ function GameStatusBox({
           onSubmitMove={onSubmitMove}
           canCreateGame={canCreateGame}
           canSubmitMove={canSubmitMove}
-          canJoinGame={canJoinGame}
           onViewResults={onViewResults}
           isViewingResults={isViewingResults}
           setModalMode={setModalMode}
@@ -838,23 +831,8 @@ function GameStatusBox({
         />
         <GameResultDetails
           userGameRole={userGameRole}
-          // gameResult={"Draw"}
-          // gameResult={"Player 1 Wins!"}
-          // myMove={myMove}
-          // gameResult={gameResult} myMove={myMove} />
-          gameResult={"Player 2 Wins!"}
-          myMove={"Rock"}
-        />
-        <GameResultDetails
-          userGameRole={userGameRole}
-          gameResult={"Player 1 Wins!"}
-          myMove={"Paper"}
-        />
-
-        <GameResultDetails
-          userGameRole={userGameRole}
-          gameResult={"Draw!"}
-          myMove={"Scissors"}
+          gameResult={gameResult}
+          myMove={myMove}
         />
       </div>
       {gameData && (
@@ -875,7 +853,7 @@ function GameStatusBoxSection({
   onSubmitMove,
   canCreateGame,
   canSubmitMove,
-  canJoinGame,
+
   gameResult,
   myMove,
   isViewingResults,
@@ -884,6 +862,7 @@ function GameStatusBoxSection({
   setShowMoveSelector,
   isSubmittingMove,
   isCreatingGame,
+  isLoadingGameData,
 }: {
   gameData: any;
   gameId: bigint | null;
@@ -893,7 +872,7 @@ function GameStatusBoxSection({
   onSubmitMove: () => void;
   canCreateGame: boolean;
   canSubmitMove: boolean;
-  canJoinGame: boolean;
+
   gameResult: string | null;
   myMove: string | null;
   isViewingResults: boolean;
@@ -902,6 +881,7 @@ function GameStatusBoxSection({
   setShowMoveSelector: (show: boolean) => void;
   isSubmittingMove: boolean;
   isCreatingGame: boolean;
+  isLoadingGameData: boolean;
 }) {
   return (
     <div className="col-span-full mx-20 px-4 py-4 rounded-lg bg-white border-2 border-black">
@@ -914,7 +894,6 @@ function GameStatusBoxSection({
         onSubmitMove={onSubmitMove}
         canCreateGame={canCreateGame}
         canSubmitMove={canSubmitMove}
-        canJoinGame={canJoinGame}
         gameResult={gameResult}
         myMove={myMove}
         isViewingResults={isViewingResults}
@@ -923,6 +902,7 @@ function GameStatusBoxSection({
         setShowMoveSelector={setShowMoveSelector}
         isSubmittingMove={isSubmittingMove}
         isCreatingGame={isCreatingGame}
+        isLoadingGameData={isLoadingGameData}
       />
     </div>
   );
@@ -930,9 +910,33 @@ function GameStatusBoxSection({
 
 function MessageSection({ message }: { message: string }) {
   return (
-    <div className="col-span-full mx-20 p-4 rounded-lg bg-white border-2 border-black">
+    <div className="col-span-full mx-20 p-4 rounded-lg bg-white border-2 border-black overflow-auto">
       {printProperty("Message", message)}
     </div>
+  );
+}
+
+function MoveButton({
+  onClick,
+  active,
+  children,
+}: {
+  onClick: () => void;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all duration-200 transform hover:scale-105 
+        ${
+          active
+            ? "border-yellow-400 bg-gradient-to-br from-yellow-50 to-yellow-100"
+            : "border-gray-200 hover:border-yellow-300 hover:bg-gradient-to-br hover:from-yellow-25 hover:to-yellow-50"
+        }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -953,48 +957,46 @@ function MoveSelectorModal({
   handleSubmitMove: () => void;
   isSubmittingMove: boolean;
 }) {
+  const moves = [
+    {
+      icon: FaHandRock,
+      label: "Rock",
+    },
+    {
+      icon: FaHandPaper,
+      label: "Paper",
+    },
+    {
+      icon: FaHandScissors,
+      label: "Scissors",
+      className: "rotate-90",
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <h3 className="text-lg font-semibold mb-4 text-center">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-xl shadow-2xl max-w-md w-full mx-4 border-2 border-black">
+        <h3 className="text-xl font-bold mb-6 text-center text-black">
           {modalMode === "join"
             ? "Choose Your Move to Join Game"
             : "Choose Your Move"}
         </h3>
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <button
-            onClick={() => setSelectedMove(0)}
-            className={`flex flex-col items-center p-4 rounded-lg border-2 transition-colors ${
-              selectedMove === 0
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <FaHandRock className="text-3xl mb-2" />
-            <span className="font-medium">Rock</span>
-          </button>
-          <button
-            onClick={() => setSelectedMove(1)}
-            className={`flex flex-col items-center p-4 rounded-lg border-2 transition-colors ${
-              selectedMove === 1
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <FaHandPaper className="text-3xl mb-2" />
-            <span className="font-medium">Paper</span>
-          </button>
-          <button
-            onClick={() => setSelectedMove(2)}
-            className={`flex flex-col items-center p-4 rounded-lg border-2 transition-colors ${
-              selectedMove === 2
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <FaRegHandScissors className="text-3xl mb-2 rotate-90" />
-            <span className="font-medium">Scissors</span>
-          </button>
+          {moves.map((move, index) => {
+            const isActive = selectedMove === index;
+            return (
+              <MoveButton
+                key={index}
+                onClick={() => setSelectedMove(index)}
+                active={isActive}
+              >
+                <move.icon
+                  className={`text-4xl mb-2 transition-colors ${isActive ? "text-yellow-700" : "text-gray-600"} ${move.className}`}
+                />
+                <span className="font-semibold text-black">{move.label}</span>
+              </MoveButton>
+            );
+          })}
         </div>
         <div className="flex gap-3">
           <button
@@ -1003,14 +1005,14 @@ function MoveSelectorModal({
               setSelectedMove(0);
               setModalMode("submit");
             }}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-semibold"
+            className="flex-1 px-4 py-2 border-2 border-slate-300 rounded-lg text-slate-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100 hover:border-slate-400 font-semibold transition-all duration-200"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmitMove}
             disabled={selectedMove === null || isSubmittingMove}
-            className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+            className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-500 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed font-semibold transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
           >
             {isSubmittingMove
               ? modalMode === "join"
