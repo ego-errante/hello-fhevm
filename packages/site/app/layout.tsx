@@ -10,8 +10,9 @@ import {
 } from "react-icons/fa";
 
 export const metadata: Metadata = {
-  title: "Zama FHEVM SDK Quickstart",
-  description: "Zama FHEVM SDK Quickstart app",
+  title: "Encrypted Rock Paper Scissors",
+  description:
+    "Onchain encrypted Rock Paper Scissors app powered by Zama FHEVM",
 };
 
 const funnelSans = Funnel_Sans({
@@ -30,16 +31,22 @@ export default async function RootLayout({
         <div className="fixed inset-0 w-full h-full zama-bg z-[-20] min-w-[850px]"></div>
         <main className="flex flex-col max-w-screen-lg mx-auto pb-20 min-w-[850px]">
           <nav className="flex w-full px-3 md:px-0 h-fit py-10 justify-between items-center">
-            <div className="flex items-center border-black p-1 border-2">
-              <FaHandRock className="size-10" />
-              <FaHandPaper className="size-10" />
-              <FaHandScissors className="rotate-90 size-10" />
-              <FaLock className="size-10" />
-            </div>
+            <AppLogo />
           </nav>
           <Providers>{children}</Providers>
         </main>
       </body>
     </html>
+  );
+}
+
+function AppLogo() {
+  return (
+    <div className="flex items-center border-black p-1 border-2">
+      <FaHandRock className="size-10" />
+      <FaHandPaper className="size-10" />
+      <FaHandScissors className="rotate-90 size-10" />
+      <FaLock className="size-10" />
+    </div>
   );
 }
