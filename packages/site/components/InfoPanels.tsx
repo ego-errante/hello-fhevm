@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import { printProperty } from "./DataDisplay";
+import { FaBook } from "react-icons/fa";
 
 export function ChainInfoSection({
   chainId,
@@ -62,7 +63,10 @@ export function FhevmInstanceSection({
 export function HowToPlaySection() {
   return (
     <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
-      <p className="font-semibold text-black text-lg mt-4">How to Play</p>
+      <div className="flex items-center gap-2 mt-4">
+        <FaBook />
+        <p className="font-semibold text-black text-lg">How to Play</p>
+      </div>
 
       <div className="mt-3 space-y-6">
         <div>

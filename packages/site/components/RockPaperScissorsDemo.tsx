@@ -5,7 +5,7 @@ import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
 import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSigner";
 import { useRockPaperScissors } from "../hooks/useRockPaperScissors/useRockPaperScissors";
 import { errorNotDeployed } from "./ErrorNotDeployed";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { GameStatusBoxSection } from "./GameStatus";
 import { MessageSection } from "./MessageSection";
 import {
@@ -53,15 +53,72 @@ export const RockPaperScissorsDemo = () => {
     userAddress: accounts?.[0] as `0x${string}` | undefined,
   });
 
-  // Get detailed message from hook
-  const message = rockPaperScissors.message;
-
-  // Get loading state for game data
-  const isLoadingGameData = rockPaperScissors.isLoadingGames;
-
   const [selectedMove, setSelectedMove] = useState<number | null>(null);
   const [showMoveSelector, setShowMoveSelector] = useState(false);
   const [modalMode, setModalMode] = useState<"join" | "submit">("submit");
+
+  const handleSubmitMove = async () => {
+    if (selectedMove !== null) {
+      // Start the async operation but close modal immediately (optimistic UI)
+      setShowMoveSelector(false);
+      setSelectedMove(null);
+      setModalMode("submit");
+      rockPaperScissors.submitEncryptedMove(selectedMove);
+    }
+  };
+
+  const gameState = useMemo(
+    () => ({
+      gameData: rockPaperScissors.latestGame?.data ?? null,
+      gameId: rockPaperScissors.latestGame?.gameId ?? null,
+      userGameRole: rockPaperScissors.userGameRole,
+      gameResult: rockPaperScissors.gameResult,
+      myMove: rockPaperScissors.myMove,
+      isLoadingGameData: rockPaperScissors.isLoadingGames,
+    }),
+    [
+      rockPaperScissors.isLoadingGames,
+      rockPaperScissors.gameResult,
+      rockPaperScissors.latestGame?.data,
+      rockPaperScissors.latestGame?.gameId,
+      rockPaperScissors.myMove,
+      rockPaperScissors.userGameRole,
+    ]
+  );
+
+  const uiState = useMemo(
+    () => ({
+      canCreateGame: rockPaperScissors.canCreateGame ?? false,
+      canSubmitMove: rockPaperScissors.canSubmitMove ?? false,
+      isSubmittingMove: rockPaperScissors.isSubmittingMove,
+      isCreatingGame: rockPaperScissors.isCreatingGame,
+      isViewingResults: rockPaperScissors.isViewingResults,
+    }),
+    [
+      rockPaperScissors.canCreateGame,
+      rockPaperScissors.canSubmitMove,
+      rockPaperScissors.isCreatingGame,
+      rockPaperScissors.isSubmittingMove,
+      rockPaperScissors.isViewingResults,
+    ]
+  );
+
+  const actions = useMemo(
+    () => ({
+      onCreateGame: rockPaperScissors.createGame,
+      onSubmitMove: () => setShowMoveSelector(true),
+      onViewResults: rockPaperScissors.viewResults,
+    }),
+    [rockPaperScissors.createGame, rockPaperScissors.viewResults]
+  );
+
+  const modalControls = useMemo(
+    () => ({
+      setModalMode,
+      setShowMoveSelector,
+    }),
+    [setModalMode, setShowMoveSelector]
+  );
 
   if (!isConnected) {
     return <ConnectButton isConnected={isConnected} connect={connect} />;
@@ -70,16 +127,6 @@ export const RockPaperScissorsDemo = () => {
   if (rockPaperScissors.isDeployed === false) {
     return errorNotDeployed(chainId);
   }
-
-  const handleSubmitMove = async () => {
-    if (selectedMove !== null) {
-      setShowMoveSelector(false);
-      setSelectedMove(null);
-      setModalMode("submit");
-      // Start the async operation but close modal immediately (optimistic UI)
-      rockPaperScissors.submitEncryptedMove(selectedMove);
-    }
-  };
 
   return (
     <div className="grid w-full gap-4">
@@ -92,26 +139,13 @@ export const RockPaperScissorsDemo = () => {
       </div>
 
       <GameStatusBoxSection
-        gameData={rockPaperScissors.latestGame?.data}
-        gameId={rockPaperScissors.latestGame?.gameId ?? null}
-        userAddress={accounts?.[0] as `0x${string}` | undefined}
-        userGameRole={rockPaperScissors.userGameRole}
-        onCreateGame={rockPaperScissors.createGame}
-        onSubmitMove={() => setShowMoveSelector(true)}
-        canCreateGame={rockPaperScissors.canCreateGame ?? false}
-        canSubmitMove={rockPaperScissors.canSubmitMove ?? false}
-        gameResult={rockPaperScissors.gameResult}
-        myMove={rockPaperScissors.myMove}
-        isViewingResults={rockPaperScissors.isViewingResults}
-        onViewResults={rockPaperScissors.viewResults}
-        setModalMode={setModalMode}
-        setShowMoveSelector={setShowMoveSelector}
-        isSubmittingMove={rockPaperScissors.isSubmittingMove}
-        isCreatingGame={rockPaperScissors.isCreatingGame}
-        isLoadingGameData={isLoadingGameData}
+        gameState={gameState}
+        uiState={uiState}
+        actions={actions}
+        modalControls={modalControls}
       />
 
-      <MessageSection message={message} />
+      <MessageSection message={rockPaperScissors.message} />
 
       <h3 className="font-semibold text-black text-2xl mt-4 mx-auto">
         TECHNICAL DETAILS AND HOW TO PLAY
