@@ -60,7 +60,7 @@ export function useGameActions(parameters: {
         queryKey: ["rock-paper-scissors", "game-results"],
       });
 
-      setMessage("Creating new game...");
+      setMessage("[FHE::Arena] Initializing encrypted battleground...");
 
       const contract = new ethers.Contract(
         rockPaperScissors.address,
@@ -70,11 +70,15 @@ export function useGameActions(parameters: {
 
       const tx = await contract.createGame();
 
-      setMessage(`Waiting for transaction: ${tx.hash}...`);
+      setMessage(
+        `{Chain::Referee} Sealing battleground on-chain: ${tx.hash}...`
+      );
 
       const receipt = await tx.wait();
 
-      setMessage(`Game created! Status: ${receipt?.status}`);
+      setMessage(
+        `{FHE::Arena} Battleground sealed (status ${receipt?.status})`
+      );
 
       return receipt;
     },
@@ -85,7 +89,7 @@ export function useGameActions(parameters: {
       });
     },
     onError: (error) => {
-      setMessage("Failed to create game: " + (error as Error).message);
+      setMessage("[Error::Arena] Setup failed - " + (error as Error).message);
     },
   });
 
@@ -143,7 +147,7 @@ export function useGameActions(parameters: {
         throw new Error("Cannot submit move");
       }
 
-      setMessage("Encrypting your move...");
+      setMessage("[FHE::Vault] Wrapping your move in ciphertext...");
 
       const contract = new ethers.Contract(
         rockPaperScissors.address!,
@@ -156,7 +160,7 @@ export function useGameActions(parameters: {
         .add8(move)
         .encrypt();
 
-      setMessage("Submitting encrypted move...");
+      setMessage("{Arena::Gate} Dispatching encrypted throw into the arena...");
 
       const tx = await contract.submitEncryptedMove(
         latestGame.gameId,
@@ -164,11 +168,13 @@ export function useGameActions(parameters: {
         `0x${Buffer.from(encryptedMove.inputProof).toString("hex")}`
       );
 
-      setMessage(`Waiting for transaction: ${tx.hash}...`);
+      setMessage(
+        `{Chain::Referee} Recording encrypted throw on-chain: ${tx.hash}...`
+      );
 
       const receipt = await tx.wait();
 
-      setMessage(`Move submitted! Status: ${receipt?.status}`);
+      setMessage(`{Scoreboard} Encrypted throw confirmed`);
 
       return receipt;
     },
@@ -179,7 +185,9 @@ export function useGameActions(parameters: {
       });
     },
     onError: (error) => {
-      setMessage("Failed to submit move: " + (error as Error).message);
+      setMessage(
+        "[Error::Throw] Encrypted throw failed - " + (error as Error).message
+      );
     },
   });
 

@@ -4,7 +4,6 @@ import {
   FaHandPaper,
   FaHandScissors,
   FaQuestion,
-  FaLock,
 } from "react-icons/fa";
 
 export function GameResultDetails({
@@ -115,17 +114,11 @@ export function GameResultDetails({
       )}
 
       {myMove && outcomeType !== "error" && (
-        <div className="p-3 rounded-md">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className={`font-semibold text-black`}>
-              Your move: {myMove}
-            </span>
-            <span className="text-lg">{getMoveIcon(myMove)}</span>
-          </div>
-          <div className="flex items-center justify-center gap-2 text-sm">
-            <FaLock />
-            <span className={styles.accent}>Opponent's move: Hidden</span>
-          </div>
+        <div className="flex items-center justify-center gap-2 pt-3 rounded-md">
+          <span className={`font-semibold text-black`}>
+            Your move: {myMove}
+          </span>
+          <span className="text-lg">{getMoveIcon(myMove)}</span>
         </div>
       )}
     </div>

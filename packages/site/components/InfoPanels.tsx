@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import { printProperty } from "./DataDisplay";
-import { FaBook } from "react-icons/fa";
+import { FaBook, FaChevronDown } from "react-icons/fa";
+import { useState } from "react";
 
 export function ChainInfoSection({
   chainId,
@@ -16,7 +17,7 @@ export function ChainInfoSection({
   isDeployed: boolean | undefined;
 }) {
   return (
-    <div className="col-span-full mx-20 mt-4 px-5 pb-4 rounded-lg bg-white border-2 border-black">
+    <div className="col-span-full mt-4 px-5 pb-4 rounded-lg bg-white border-2 border-black">
       <p className="font-semibold text-black text-lg mt-4">Chain Infos</p>
       {printProperty("ChainId", chainId)}
       {printProperty(
@@ -97,6 +98,67 @@ export function HowToPlaySection() {
           </ol>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function TechnicalDetailsSection({
+  chainId,
+  accounts,
+  ethersSigner,
+  contractAddress,
+  isDeployed,
+  fhevmInstance,
+  fhevmStatus,
+  fhevmError,
+}: {
+  chainId: number | undefined;
+  accounts: string[] | undefined;
+  ethersSigner: ethers.Signer | undefined;
+  contractAddress: string | undefined;
+  isDeployed: boolean | undefined;
+  fhevmInstance: any;
+  fhevmStatus: string;
+  fhevmError: Error | null;
+}) {
+  const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+
+  return (
+    <div className="col-span-full mx-20 mt-4">
+      <button
+        onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+        className="flex items-center justify-center gap-2 w-full p-4 hover:cursor-pointer hover:bg-yellow-400 rounded-lg border-2 border-black"
+      >
+        <h3 className="font-semibold text-black text-2xl">
+          TECHNICAL DETAILS AND HOW TO PLAY
+        </h3>
+        <FaChevronDown
+          className={`text-black text-xl transition-transform duration-200 ${
+            isAccordionOpen ? "rotate-180" : "rotate-0"
+          }`}
+        />
+      </button>
+
+      {isAccordionOpen && (
+        <div className="mt-4 space-y-4 animate-in fade-in-50 duration-300">
+          <ChainInfoSection
+            chainId={chainId}
+            accounts={accounts}
+            ethersSigner={ethersSigner}
+            contractAddress={contractAddress}
+            isDeployed={isDeployed}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <FhevmInstanceSection
+              fhevmInstance={fhevmInstance}
+              fhevmStatus={fhevmStatus}
+              fhevmError={fhevmError}
+            />
+            <HowToPlaySection />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

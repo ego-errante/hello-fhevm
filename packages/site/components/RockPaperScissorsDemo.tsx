@@ -8,11 +8,7 @@ import { errorNotDeployed } from "./ErrorNotDeployed";
 import { useMemo, useState } from "react";
 import { GameStatusBoxSection } from "./GameStatus";
 import { MessageSection } from "./MessageSection";
-import {
-  ChainInfoSection,
-  FhevmInstanceSection,
-  HowToPlaySection,
-} from "./InfoPanels";
+import { TechnicalDetailsSection } from "./InfoPanels";
 import { MoveSelectorModal } from "./MoveSelector";
 import { ConnectButton } from "./ConnectButton";
 
@@ -147,28 +143,16 @@ export const RockPaperScissorsDemo = () => {
 
       <MessageSection message={rockPaperScissors.message} />
 
-      <h3 className="font-semibold text-black text-2xl mt-4 mx-auto">
-        TECHNICAL DETAILS AND HOW TO PLAY
-      </h3>
-
-      <ChainInfoSection
+      <TechnicalDetailsSection
         chainId={chainId}
         accounts={accounts}
         ethersSigner={ethersSigner}
         contractAddress={rockPaperScissors.contractAddress}
         isDeployed={rockPaperScissors.isDeployed}
+        fhevmInstance={fhevmInstance}
+        fhevmStatus={fhevmStatus}
+        fhevmError={fhevmError ?? null}
       />
-
-      <div className="col-span-full mx-20">
-        <div className="grid grid-cols-2 gap-4">
-          <FhevmInstanceSection
-            fhevmInstance={fhevmInstance}
-            fhevmStatus={fhevmStatus}
-            fhevmError={fhevmError ?? null}
-          />
-          <HowToPlaySection />
-        </div>
-      </div>
 
       {/* Move Selector Modal */}
       {showMoveSelector && (

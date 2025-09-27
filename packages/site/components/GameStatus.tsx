@@ -1,4 +1,4 @@
-import { FaRegHourglass, FaCube } from "react-icons/fa";
+import { FaCube, FaLock } from "react-icons/fa";
 import { LuLoaderCircle } from "react-icons/lu";
 import { GAME_STATUS, GAME_ROLE } from "@/lib/constants";
 import { GameButton, ButtonContainer } from "./GameButton";
@@ -28,8 +28,8 @@ export function GameStatusBoxSection({
   if (isLoadingGameData && !gameData) {
     return (
       <div className="col-span-full mx-20 px-4 py-4 rounded-lg bg-white border-2 border-black">
-        <h4 className="font-semibold mb-4 text-center flex items-center justify-center gap-2">
-          <FaRegHourglass />
+        <h4 className="font-bold mb-4  text-xl text-center flex items-center justify-center gap-2">
+          <FaCube />
           <span>GAME STATUS</span>
         </h4>
         <div className="flex items-center justify-center pb-8 pt-4">
@@ -119,9 +119,20 @@ export function Player1View({ gameData, actions, uiState }: Player1ViewProps) {
       <div>
         <span className="font-medium">Opponent:</span>
         <p className="font-mono break-all mt-1">
-          {hasOpponent ? gameData.player2 : "Waiting for opponent"}
+          {hasOpponent ? gameData.player2 : "No opponent yet"}
         </p>
       </div>
+
+      {gameData.status === GAME_STATUS.RESOLVED && (
+        <div>
+          <span className="font-medium">Opponent's move:</span>
+          <div className="flex items-center gap-1">
+            <FaLock className="size-3" />
+            <p>Hidden</p>
+          </div>
+        </div>
+      )}
+
       <div>
         <span className="font-medium">Status:</span>
         <p className="mt-1">
@@ -144,6 +155,7 @@ export function Player1View({ gameData, actions, uiState }: Player1ViewProps) {
           </GameButton>
         </ButtonContainer>
       )}
+
       {gameData.status === GAME_STATUS.PLAYER1_SUBMITTED && (
         <ButtonContainer>
           <GameButton variant="waiting" onClick={() => {}} disabled>
@@ -151,6 +163,7 @@ export function Player1View({ gameData, actions, uiState }: Player1ViewProps) {
           </GameButton>
         </ButtonContainer>
       )}
+
       {gameData.status === GAME_STATUS.RESOLVED && (
         <ButtonContainer>
           <GameButton
@@ -176,6 +189,7 @@ export function Player1View({ gameData, actions, uiState }: Player1ViewProps) {
 export function Player2View({ gameData, actions, uiState }: Player2ViewProps) {
   const { onViewResults, onCreateGame } = actions;
   const { isViewingResults, canCreateGame, isCreatingGame } = uiState;
+
   return (
     <>
       <div>
@@ -186,10 +200,15 @@ export function Player2View({ gameData, actions, uiState }: Player2ViewProps) {
         <p className="font-mono break-all mt-1">{gameData.player1}</p>
       </div>
       <div>
+        <span className="font-medium">Opponent's move:</span>
+        <div className="flex items-center gap-1">
+          <FaLock className="size-3" />
+          <p>Hidden</p>
+        </div>
+      </div>
+      <div>
         <span className="font-medium">Status:</span>
         <p className="mt-1">
-          {gameData.status === GAME_STATUS.PLAYER1_SUBMITTED &&
-            "Move submitted - waiting for results"}
           {gameData.status === GAME_STATUS.RESOLVED && "Game resolved"}
         </p>
       </div>
