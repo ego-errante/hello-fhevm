@@ -39,26 +39,13 @@ contract RockPaperScissors is SepoliaConfig {
     event MoveSubmitted(uint256 indexed gameId, address indexed player);
     event GameResolved(uint256 indexed gameId);
 
+
     /// @notice Get the next game ID (public getter for latest game ID = nextGameId - 1)
     /// @return The next game ID to be assigned
     function getNextGameId() external view returns (uint256) {
         return _nextGameId;
     }
 
-    /// @notice Creates a new game
-    /// @return gameId The unique identifier for the new game
-    function createGame() external returns (uint256 gameId) {
-        gameId = _nextGameId++;
-
-        _games[gameId].player1 = msg.sender;
-        _games[gameId].player2 = address(0);
-        // move1, move2, result remain uninitialized (ZeroHash by default)
-        _games[gameId].status = GameStatus.Created;
-        _games[gameId].createdAt = block.timestamp;
-        _games[gameId].resolvedAt = 0;
-
-        emit GameCreated(gameId, msg.sender);
-    }
 
     /// @notice Gets game information
     /// @param gameId The game identifier
@@ -101,6 +88,21 @@ contract RockPaperScissors is SepoliaConfig {
         );
     }
 
+    /// @notice Creates a new game
+    /// @return gameId The unique identifier for the new game
+    function createGame() external returns (uint256 gameId) {
+        gameId = _nextGameId++;
+
+        _games[gameId].player1 = msg.sender;
+        _games[gameId].player2 = address(0);
+        // move1, move2, result remain uninitialized (ZeroHash by default)
+        _games[gameId].status = GameStatus.Created;
+        _games[gameId].createdAt = block.timestamp;
+        _games[gameId].resolvedAt = 0;
+
+        emit GameCreated(gameId, msg.sender);
+    }
+
     /// @notice Submits an encrypted move for a game
     /// @param gameId The game identifier
     /// @param encryptedMove The encrypted move (0=rock, 1=paper, 2=scissors)
@@ -112,27 +114,23 @@ contract RockPaperScissors is SepoliaConfig {
 
         euint8 move = FHE.fromExternal(encryptedMove, inputProof);
 
-        // Validate and normalize move to range (0, 1, 2) using FHE operations
-        // This approach clamps any input to the valid range without branching
-
-        // Simple modulo 3 operation using available FHE operations
+        // Validate and normalize move to range (0, 1, 2) using modulo 3 operation in FHE
         // For any input, this will map it to 0, 1, or 2
         euint8 validatedMove = FHE.rem(move, 3);
 
         if (msg.sender == game.player1) {
             // Player 1 is submitting their move
             require(game.status == GameStatus.Created, "Player1 can only submit in Created state");
+            
             game.move1 = validatedMove;
             game.status = GameStatus.Player1MoveSubmitted;
         } else {
-            // This could be player 2 joining and submitting move
+            // This is player 2 joining and submitting their move
             require(game.status == GameStatus.Player1MoveSubmitted, "Player1 must submit their move first");
-            if (game.player2 == address(0)) {
-                game.player2 = msg.sender;
-            } else {
-                require(msg.sender == game.player2, "Only player1 or player2 can submit moves");
-            }
+            
+            game.player2 = msg.sender;
             game.move2 = validatedMove;
+            
             // When player 2 submits their move, we can immediately resolve the game.
             _resolveGame(gameId, game);
         }
