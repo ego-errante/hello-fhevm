@@ -530,19 +530,19 @@ describe("RockPaperScissors", function () {
     });
 
     it("should allow players to access their own move", async function () {
-      const aliceMove = await rockPaperScissorsContract.connect(signers.alice).getMyMove(gameId);
+      const aliceGameData = await rockPaperScissorsContract.connect(signers.alice).getGame(gameId);
       const decryptedAliceMove = await fhevm.userDecryptEuint(
         FhevmType.euint8,
-        aliceMove,
+        aliceGameData.move1,
         rockPaperScissorsContractAddress,
         signers.alice,
       );
       expect(decryptedAliceMove).to.equal(0); // Rock
 
-      const bobMove = await rockPaperScissorsContract.connect(signers.bob).getMyMove(gameId);
+      const bobGameData = await rockPaperScissorsContract.connect(signers.bob).getGame(gameId);
       const decryptedBobMove = await fhevm.userDecryptEuint(
         FhevmType.euint8,
-        bobMove,
+        bobGameData.move2,
         rockPaperScissorsContractAddress,
         signers.bob,
       );
@@ -573,12 +573,6 @@ describe("RockPaperScissors", function () {
       ).to.be.rejected;
     });
 
-    it("should prevent non-players from accessing any moves", async function () {
-      await expect(rockPaperScissorsContract.connect(signers.charlie).getMyMove(gameId)).to.be.revertedWith(
-        "Only game participants can access their moves",
-      );
-    });
-
     it("should allow accessing game data before game is resolved", async function () {
       // Create a new unresolved game
       const tx = await rockPaperScissorsContract.connect(signers.alice).createGame();
@@ -589,11 +583,6 @@ describe("RockPaperScissors", function () {
       const gameData = await rockPaperScissorsContract.connect(signers.alice).getGame(newGameId);
       expect(gameData.player1).to.equal(signers.alice.address);
       expect(gameData.status).to.equal(0); // Created
-
-      // But getMyMove should still require the game to be resolved
-      await expect(rockPaperScissorsContract.connect(signers.alice).getMyMove(newGameId)).to.be.revertedWith(
-        "Game must be resolved first",
-      );
     });
   });
 });

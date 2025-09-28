@@ -28,7 +28,7 @@ contract RockPaperScissors is SepoliaConfig {
     }
 
     /// @notice Mapping of game ID to game data
-    mapping(uint256 => Game) private _games;
+    mapping(uint256 gameId => Game game) private _games;
 
     /// @notice Counter for generating unique game IDs
     uint256 private _nextGameId = 1;
@@ -199,23 +199,5 @@ contract RockPaperScissors is SepoliaConfig {
         game.resolvedAt = block.timestamp;
 
         emit GameResolved(gameId);
-    }
-
-
-    /// @notice Allows a player to decrypt their own move only (for verification purposes)
-    /// @param gameId The game identifier
-    /// @return move The encrypted move of the calling player
-    function getMyMove(uint256 gameId) external view returns (euint8 move) {
-        Game storage game = _games[gameId];
-        require(game.player1 != address(0), "Game does not exist");
-        require(game.status == GameStatus.Resolved, "Game must be resolved first");
-
-        if (msg.sender == game.player1) {
-            return game.move1;
-        } else if (msg.sender == game.player2) {
-            return game.move2;
-        } else {
-            revert("Only game participants can access their moves");
-        }
     }
 }
