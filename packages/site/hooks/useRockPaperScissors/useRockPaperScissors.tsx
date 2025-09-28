@@ -1,9 +1,11 @@
 "use client";
 
 import { ethers } from "ethers";
-import { RefObject } from "react";
+import { RefObject, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { RockPaperScissorsAddresses } from "@/abi/RockPaperScissorsAddresses";
+import { RockPaperScissorsABI } from "@/abi/RockPaperScissorsABI";
 import { type FhevmInstance, type GenericStringStorage } from "@fhevm/react";
 import { useGameState } from "./useGameState";
 import { useGameActions } from "./useGameActions";
@@ -38,6 +40,51 @@ export const useRockPaperScissors = (parameters: {
   } = parameters;
 
   const queryClient = useQueryClient();
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Event Listeners
+  //////////////////////////////////////////////////////////////////////////////
+
+  useEffect(() => {
+    if (!ethersReadonlyProvider || !chainId) return;
+
+    const contractAddress =
+      RockPaperScissorsAddresses[
+        String(chainId) as keyof typeof RockPaperScissorsAddresses
+      ]?.address;
+    if (!contractAddress) return;
+
+    const contract = new ethers.Contract(
+      contractAddress,
+      RockPaperScissorsABI.abi,
+      ethersReadonlyProvider
+    );
+
+    const invalidateQuery = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["rock-paper-scissors", "latest-game"],
+      });
+    };
+
+    contract.on("GameCreated", () => {
+      console.log("GameCreated");
+      invalidateQuery();
+    });
+    contract.on("MoveSubmitted", () => {
+      console.log("MoveSubmitted");
+      invalidateQuery();
+    });
+    contract.on("GameResolved", () => {
+      console.log("GameResolved");
+      invalidateQuery();
+    });
+
+    return () => {
+      contract.off("GameCreated", invalidateQuery);
+      contract.off("MoveSubmitted", invalidateQuery);
+      contract.off("GameResolved", invalidateQuery);
+    };
+  }, [ethersReadonlyProvider, chainId, queryClient]);
 
   //////////////////////////////////////////////////////////////////////////////
   // Sub-hooks for organized logic

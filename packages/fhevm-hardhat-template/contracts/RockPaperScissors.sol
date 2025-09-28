@@ -33,16 +33,17 @@ contract RockPaperScissors is SepoliaConfig {
     /// @notice Counter for generating unique game IDs
     uint256 private _nextGameId = 1;
 
-    /// @notice Get the next game ID (public getter for latest game ID = nextGameId - 1)
-    /// @return The next game ID to be assigned
-    function getNextGameId() external view returns (uint256) {
-        return _nextGameId;
-    }
 
     /// @notice Events
     event GameCreated(uint256 indexed gameId, address indexed player1);
     event MoveSubmitted(uint256 indexed gameId, address indexed player);
     event GameResolved(uint256 indexed gameId);
+
+    /// @notice Get the next game ID (public getter for latest game ID = nextGameId - 1)
+    /// @return The next game ID to be assigned
+    function getNextGameId() external view returns (uint256) {
+        return _nextGameId;
+    }
 
     /// @notice Creates a new game
     /// @return gameId The unique identifier for the new game

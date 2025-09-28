@@ -61,6 +61,7 @@ export function useGameState(parameters: {
       rockPaperScissors.address,
     ],
     queryFn: async (): Promise<LatestGame | null> => {
+      console.log("latestGame queryFn");
       if (
         !rockPaperScissorsRef.current ||
         !rockPaperScissorsRef.current?.chainId ||
@@ -112,7 +113,6 @@ export function useGameState(parameters: {
       }
     },
     enabled: !!rockPaperScissors.address && !!ethersReadonlyProvider,
-    refetchInterval: 3000, // Auto-refresh every 3 seconds
     retry: 3,
   });
 
