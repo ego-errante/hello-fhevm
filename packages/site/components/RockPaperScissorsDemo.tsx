@@ -4,7 +4,7 @@ import { useFhevm } from "@fhevm/react";
 import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
 import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSigner";
 import { useRockPaperScissors } from "../hooks/useRockPaperScissors/useRockPaperScissors";
-import { errorNotDeployed } from "./ErrorNotDeployed";
+import { ErrorNotDeployed } from "./ErrorNotDeployed";
 import { useMemo, useState } from "react";
 import { GameStatusBoxSection } from "./GameStatus";
 import { MessageSection } from "./MessageSection";
@@ -121,7 +121,7 @@ export const RockPaperScissorsDemo = () => {
   }
 
   if (!rockPaperScissors.isDeployed) {
-    return errorNotDeployed(chainId);
+    return <ErrorNotDeployed chainId={chainId} />;
   }
 
   return (

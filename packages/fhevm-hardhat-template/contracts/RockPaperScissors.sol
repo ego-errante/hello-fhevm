@@ -39,55 +39,6 @@ contract RockPaperScissors is SepoliaConfig {
     event MoveSubmitted(uint256 indexed gameId, address indexed player);
     event GameResolved(uint256 indexed gameId);
 
-
-    /// @notice Get the next game ID (public getter for latest game ID = nextGameId - 1)
-    /// @return The next game ID to be assigned
-    function getNextGameId() external view returns (uint256) {
-        return _nextGameId;
-    }
-
-
-    /// @notice Gets game information
-    /// @param gameId The game identifier
-    /// @return player1 Address of player 1
-    /// @return player2 Address of player 2
-    /// @return move1 Encrypted move of player 1
-    /// @return move2 Encrypted move of player 2
-    /// @return result Encrypted game result
-    /// @return status Current game status
-    /// @return createdAt Timestamp when game was created
-    /// @return resolvedAt Timestamp when game was resolved
-    function getGame(
-        uint256 gameId
-    )
-        external
-        view
-        returns (
-            address player1,
-            address player2,
-            euint8 move1,
-            euint8 move2,
-            euint8 result,
-            GameStatus status,
-            uint256 createdAt,
-            uint256 resolvedAt
-        )
-    {
-        Game storage game = _games[gameId];
-        require(game.player1 != address(0), "Game does not exist");
-
-        return (
-            game.player1,
-            game.player2,
-            game.move1,
-            game.move2,
-            game.result,
-            game.status,
-            game.createdAt,
-            game.resolvedAt
-        );
-    }
-
     /// @notice Creates a new game
     /// @return gameId The unique identifier for the new game
     function createGame() external returns (uint256 gameId) {
@@ -196,5 +147,54 @@ contract RockPaperScissors is SepoliaConfig {
         game.resolvedAt = block.timestamp;
 
         emit GameResolved(gameId);
+    }
+
+
+    /// @notice Get the next game ID (public getter for latest game ID = nextGameId - 1)
+    /// @return The next game ID to be assigned
+    function getNextGameId() external view returns (uint256) {
+        return _nextGameId;
+    }
+
+
+    /// @notice Gets game information
+    /// @param gameId The game identifier
+    /// @return player1 Address of player 1
+    /// @return player2 Address of player 2
+    /// @return move1 Encrypted move of player 1
+    /// @return move2 Encrypted move of player 2
+    /// @return result Encrypted game result
+    /// @return status Current game status
+    /// @return createdAt Timestamp when game was created
+    /// @return resolvedAt Timestamp when game was resolved
+    function getGame(
+        uint256 gameId
+    )
+        external
+        view
+        returns (
+            address player1,
+            address player2,
+            euint8 move1,
+            euint8 move2,
+            euint8 result,
+            GameStatus status,
+            uint256 createdAt,
+            uint256 resolvedAt
+        )
+    {
+        Game storage game = _games[gameId];
+        require(game.player1 != address(0), "Game does not exist");
+
+        return (
+            game.player1,
+            game.player2,
+            game.move1,
+            game.move2,
+            game.result,
+            game.status,
+            game.createdAt,
+            game.resolvedAt
+        );
     }
 }

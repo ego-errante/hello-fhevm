@@ -1,4 +1,4 @@
-export function errorNotDeployed(chainId: number | undefined) {
+export function ErrorNotDeployed({ chainId }: { chainId: number | undefined }) {
   return (
     <div className="grid w-full gap-4 mx-auto font-semibold bg-none">
       <div className="col-span-full mx-20">
