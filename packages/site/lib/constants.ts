@@ -1,5 +1,3 @@
-import { RockPaperScissorsABI } from "@/abi/RockPaperScissorsABI";
-
 /**
  * Game status constants for RockPaperScissors contract
  * These correspond to the enum values in the smart contract

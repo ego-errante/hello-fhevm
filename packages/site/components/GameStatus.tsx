@@ -3,7 +3,7 @@ import { LuLoaderCircle } from "react-icons/lu";
 import { GAME_STATUS, GAME_ROLE } from "@/lib/constants";
 import { GameButton, ButtonContainer } from "./GameButton";
 import { GameResultDetails } from "./GameResult";
-import { GameRole } from "@/lib/types";
+import { GameData, GameRole } from "@/lib/types";
 
 export function GameStatusBoxSection({
   gameState,
@@ -125,7 +125,7 @@ export function Player1View({ gameData, actions, uiState }: Player1ViewProps) {
 
       {gameData.status === GAME_STATUS.RESOLVED && (
         <div>
-          <span className="font-medium">Opponent's move:</span>
+          <span className="font-medium">Opponent&apos;s move:</span>
           <div className="flex items-center gap-1 mt-1">
             <FaLock className="size-3" />
             <p>Hidden</p>
@@ -200,7 +200,7 @@ export function Player2View({ gameData, actions, uiState }: Player2ViewProps) {
         <p className="font-mono break-all mt-1">{gameData.player1}</p>
       </div>
       <div>
-        <span className="font-medium">Opponent's move:</span>
+        <span className="font-medium">Opponent&apos;s move:</span>
         <div className="flex items-center gap-1">
           <FaLock className="size-3" />
           <p>Hidden</p>
@@ -288,7 +288,7 @@ export function SpectatorView({
 }
 
 interface GameState {
-  gameData: any;
+  gameData: GameData | null;
   gameId: bigint | null;
   userGameRole: GameRole;
   gameResult: string | null;
@@ -316,19 +316,19 @@ interface ModalControls {
 }
 
 interface Player1ViewProps {
-  gameData: any;
+  gameData: GameData;
   actions: GameActions;
   uiState: GameUiState;
 }
 
 interface Player2ViewProps {
-  gameData: any;
+  gameData: GameData;
   actions: GameActions;
   uiState: GameUiState;
 }
 
 interface SpectatorViewProps {
-  gameData: any;
+  gameData: GameData;
   modalControls: ModalControls;
   uiState: GameUiState;
 }

@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import { printProperty } from "./DataDisplay";
 import { FaBook, FaChevronDown } from "react-icons/fa";
 import { useState } from "react";
+import { FhevmInstance } from "@fhevm/react";
 
 export function ChainInfoSection({
   chainId,
@@ -31,7 +32,8 @@ export function ChainInfoSection({
       {printProperty(
         "Signer",
         ethersSigner
-          ? (ethersSigner as any).address || "Signer available"
+          ? (ethersSigner as unknown as { address: string }).address ||
+              "Signer available"
           : "No signer"
       )}
 
@@ -47,14 +49,14 @@ export function FhevmInstanceSection({
   fhevmStatus,
   fhevmError,
 }: {
-  fhevmInstance: any;
+  fhevmInstance: FhevmInstance | undefined;
   fhevmStatus: string;
   fhevmError: Error | null;
 }) {
   return (
     <div className="rounded-lg bg-white border-2 border-black pb-4 px-4">
       <p className="font-semibold text-black text-lg mt-4">FHEVM instance</p>
-      {printProperty("Fhevm Instance", fhevmInstance ? "OK" : "undefined")}
+      {printProperty("Fhevm Instance", !!fhevmInstance ? "OK" : "undefined")}
       {printProperty("Fhevm Status", fhevmStatus)}
       {printProperty("Fhevm Error", fhevmError ?? "No Error")}
     </div>
@@ -117,7 +119,7 @@ export function TechnicalDetailsSection({
   ethersSigner: ethers.Signer | undefined;
   contractAddress: string | undefined;
   isDeployed: boolean | undefined;
-  fhevmInstance: any;
+  fhevmInstance: FhevmInstance | undefined;
   fhevmStatus: string;
   fhevmError: Error | null;
 }) {
