@@ -93,12 +93,16 @@ contract RockPaperScissors is SepoliaConfig {
     function createGame() external returns (uint256 gameId) {
         gameId = _nextGameId++;
 
-        _games[gameId].player1 = msg.sender;
-        _games[gameId].player2 = address(0);
-        // move1, move2, result remain uninitialized (ZeroHash by default)
-        _games[gameId].status = GameStatus.Created;
-        _games[gameId].createdAt = block.timestamp;
-        _games[gameId].resolvedAt = 0;
+        _games[gameId] = Game({
+            player1: msg.sender,
+            player2: address(0),
+            move1: FHE.asEuint8(0), 
+            move2: FHE.asEuint8(0), 
+            result: FHE.asEuint8(0), 
+            status: GameStatus.Created,
+            createdAt: block.timestamp,
+            resolvedAt: 0
+        });
 
         emit GameCreated(gameId, msg.sender);
     }
@@ -187,11 +191,6 @@ contract RockPaperScissors is SepoliaConfig {
         FHE.allowThis(game.result);
         FHE.allow(game.result, game.player1);
         FHE.allow(game.result, game.player2);
-
-        // DO NOT allow access to individual moves - this preserves privacy
-        // Only the contract can access the moves for computation
-        FHE.allowThis(game.move1);
-        FHE.allowThis(game.move2);
 
         game.status = GameStatus.Resolved;
         game.resolvedAt = block.timestamp;

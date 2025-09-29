@@ -4,12 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { RockPaperScissorsAddresses } from "@/abi/RockPaperScissorsAddresses";
 import { RockPaperScissorsABI } from "@/abi/RockPaperScissorsABI";
 import { GAME_ROLE } from "@/lib/constants";
-import {
-  RockPaperScissorsInfoType,
-  LatestGame,
-  GameRole,
-  GameData,
-} from "@/lib/types";
+import { RockPaperScissorsInfoType, LatestGame, GameData } from "@/lib/types";
 
 //////////////////////////////////////////////////////////////////////////////
 // Hook that manages the current state of the Rock Paper Scissors game.

@@ -126,7 +126,7 @@ export function Player1View({ gameData, actions, uiState }: Player1ViewProps) {
       {gameData.status === GAME_STATUS.RESOLVED && (
         <div>
           <span className="font-medium">Opponent's move:</span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 mt-1">
             <FaLock className="size-3" />
             <p>Hidden</p>
           </div>

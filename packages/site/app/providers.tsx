@@ -27,7 +27,6 @@ export function Providers({ children }: Props) {
       <MetaMaskProvider>
         <MetaMaskEthersSignerProvider
           initialMockChains={{
-            // 31337: "http://localhost:8545",
             11155111:
               "https://sepolia.infura.io/v3/9aadf67222e842aba70a6238829e66cc",
           }}

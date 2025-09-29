@@ -120,7 +120,7 @@ export const RockPaperScissorsDemo = () => {
     return <ConnectButton isConnected={isConnected} connect={connect} />;
   }
 
-  if (rockPaperScissors.isDeployed === false) {
+  if (!rockPaperScissors.isDeployed) {
     return errorNotDeployed(chainId);
   }
 

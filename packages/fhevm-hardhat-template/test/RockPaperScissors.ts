@@ -76,10 +76,6 @@ describe("RockPaperScissors", function () {
       expect(game.player1).to.equal(signers.alice.address);
       expect(game.player2).to.equal(ethers.ZeroAddress);
       expect(game.status).to.equal(0); // Created = 0
-      // Encrypted moves should be initialized (but encrypted zeros, not zero hash)
-      expect(game.move1).to.equal(ethers.ZeroHash);
-      expect(game.move2).to.equal(ethers.ZeroHash);
-      expect(game.result).to.equal(ethers.ZeroHash);
     });
 
     it("should allow multiple games to be created by the same player", async function () {
@@ -137,12 +133,6 @@ describe("RockPaperScissors", function () {
     it("should initialize game with Created status", async function () {
       const game = await rockPaperScissorsContract.getGame(gameId);
       expect(game.status).to.equal(0); // GameStatus.Created = 0
-    });
-
-    it("should have uninitialized encrypted moves", async function () {
-      const game = await rockPaperScissorsContract.getGame(gameId);
-      expect(game.move1).to.equal(ethers.ZeroHash);
-      expect(game.move2).to.equal(ethers.ZeroHash);
     });
 
     it("should have zero address for player2 initially", async function () {

@@ -30,7 +30,7 @@ export default async function RootLayout({
       <body className={`zama-bg text-foreground antialiased`}>
         <div className="fixed inset-0 w-full h-full zama-bg z-[-20] min-w-[850px]"></div>
         <main className="flex flex-col max-w-screen-lg mx-auto pb-20 min-w-[850px]">
-          <nav className="flex w-full px-3 md:px-0 h-fit py-10 justify-between items-center">
+          <nav className="flex w-full px-3 h-fit py-10 justify-between items-center">
             <AppLogo />
           </nav>
           <Providers>{children}</Providers>
