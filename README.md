@@ -2,8 +2,6 @@
 
 This project is a decentralized Rock-Paper-Scissors game that uses Zama's FHEVM technology to allow for confidential on-chain gameplay. It started as a fork of the [FHEVM React Template](https://github.com/zama-ai/fhevm-react-template) and has been extended to showcase a complete dApp.
 
-This template also illustrates how to run your FHEVM-dApp on both Sepolia as well as a local Hardhat Node (much faster).
-
 ## Project Overview
 
 The application demonstrates a privacy-preserving implementation of the classic Rock-Paper-Scissors game on the blockchain. Key features include:
